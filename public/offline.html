@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pock - Sin conexión</title>
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <style>
+      body {
+        background-color: #17191C;
+        color: #F4F6F8;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        margin: 0;
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        text-align: center;
+      }
+      .card {
+        background: #202328;
+        border: 1px solid #30353B;
+        border-radius: 16px;
+        padding: 32px;
+        max-width: 400px;
+        width: 100%;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+      }
+      .logo {
+        width: 56px;
+        height: 56px;
+        background: rgba(53, 208, 186, 0.15);
+        color: #35D0BA;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        font-weight: bold;
+        margin: 0 auto 16px auto;
+      }
+      h1 {
+        font-size: 20px;
+        font-weight: bold;
+        margin-bottom: 8px;
+        color: #F4F6F8;
+      }
+      p {
+        font-size: 14px;
+        color: #9AA3AD;
+        line-height: 1.5;
+        margin-bottom: 24px;
+      }
+      .btn {
+        background: #35D0BA;
+        color: #07150D;
+        border: none;
+        border-radius: 10px;
+        padding: 12px 20px;
+        font-size: 14px;
+        font-weight: bold;
+        cursor: pointer;
+        width: 100%;
+        transition: background 0.2s;
+      }
+      .btn:hover {
+        background: #2EB39E;
+      }
+      .balance-box {
+        background: #17191C;
+        border: 1px solid #30353B;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 24px;
+        text-align: left;
+      }
+      .balance-label {
+        font-size: 11px;
+        color: #9AA3AD;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .balance-amount {
+        font-size: 22px;
+        font-weight: bold;
+        color: #35D0BA;
+        margin-top: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div style="display:flex; justify-content:center; margin-bottom:16px;">
+        <img src="/icon-dark.svg" alt="Pock" style="width:64px; height:64px; border-radius:16px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);" />
+      </div>
+      <h1>Estás sin conexión a Internet</h1>
+      <p>iOS / Safari requiere que la aplicación haya cargado una vez en línea o que el acceso directo cargue desde la caché local.</p>
+      
+      <div id="local-info" class="balance-box" style="display:none;">
+        <div class="balance-label">Tu Dinero Libre Guardado</div>
+        <div id="offline-balance" class="balance-amount">₡0</div>
+      </div>
+
+      <button class="btn" onclick="window.location.reload();">Reintentar Conexión</button>
+    </div>
+
+    <script>
+      try {
+        const raw = localStorage.getItem('my_pocket_finance_data');
+        if (raw) {
+          const data = JSON.parse(raw);
+          if (typeof data.dinero_libre === 'number') {
+            document.getElementById('local-info').style.display = 'block';
+            document.getElementById('offline-balance').textContent = '₡' + data.dinero_libre.toLocaleString('es-CR');
+          }
+        }
+      } catch (e) {}
+    </script>
+  </body>
+</html>

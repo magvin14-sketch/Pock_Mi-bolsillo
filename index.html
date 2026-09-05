@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#121316" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Pock" />
+    <meta name="format-detection" content="telephone=no" />
+    <link id="app-apple-touch-icon" rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link id="app-favicon-svg" rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link id="app-favicon-png" rel="icon" type="image/png" sizes="64x64" href="/favicon.png" />
+    <title>Pock - Organizador Financiero</title>
+    <meta name="description" content="Organizador financiero para control de gastos, ingresos, deudas, presupuesto libre y corte de mes." />
+    <meta property="og:title" content="Pock - Organizador Financiero" />
+    <meta property="og:description" content="Organizador financiero para control de gastos, ingresos, deudas, presupuesto libre y corte de mes." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      html, body {
+        background-color: #17191C;
+        color: #F4F6F8;
+        margin: 0;
+        padding: 0;
+        min-height: 100vh;
+        font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      }
+      html.light, body.light {
+        background-color: #EDF1F5 !important;
+        color: #1A212B !important;
+      }
+    </style>
+    <script>
+      // Capture PWA install prompt immediately
+      window.__PWA_PROMPT__ = null;
+      window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        window.__PWA_PROMPT__ = e;
+        window.dispatchEvent(new CustomEvent('pwa-prompt-ready'));
+      });
+      window.addEventListener('appinstalled', function() {
+        window.__PWA_PROMPT__ = null;
+        window.dispatchEvent(new CustomEvent('pwa-installed'));
+      });
+
+      // Make window.fetch writable with getter and setter to prevent "Cannot set property fetch of #<Window> which has only a getter"
+      (function() {
+        try {
+          var _origFetch = typeof window !== 'undefined' ? window.fetch : null;
+          var _currentFetch = _origFetch;
+          
+          function getFetch() {
+            return _currentFetch || _origFetch;
+          }
+          function setFetch(val) {
+            _currentFetch = val;
+          }
+
+          if (typeof Window !== 'undefined' && Window.prototype) {
+            try {
+              Object.defineProperty(Window.prototype, 'fetch', {
+                get: getFetch,
+                set: setFetch,
+                configurable: true,
+                enumerable: true
+              });
+            } catch (e) {}
+          }
+
+          if (typeof window !== 'undefined') {
+            try {
+              Object.defineProperty(window, 'fetch', {
+                get: getFetch,
+                set: setFetch,
+                configurable: true,
+                enumerable: true
+              });
+            } catch (e) {}
+          }
+        } catch (e) {
+          // Ignore
+        }
+      })();
+
+      // Safeguard: Global error listener to prevent blank screen while filtering non-critical errors
+      window.addEventListener('error', function(event) {
+        var msg = (event && (event.message || (event.error && event.error.message))) || '';
+        if (msg.indexOf('fetch') !== -1 || msg.indexOf('ResizeObserver') !== -1) {
+          if (event.preventDefault) event.preventDefault();
+          return;
+        }
+        console.error('Window error detected:', event);
+        var root = document.getElementById('root');
+        if (root && !root.dataset.mounted) {
+          var errDiv = document.getElementById('global-error-fallback');
+          if (!errDiv) {
+            errDiv = document.createElement('div');
+            errDiv.id = 'global-error-fallback';
+            errDiv.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:#17191C;color:#F4F6F8;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;z-index:99999;font-family:sans-serif;';
+            errDiv.innerHTML = '<div style="max-width:420px;background:#202328;padding:24px;border-radius:16px;border:1px solid #30353B;display:flex;flex-direction:column;gap:12px;">' +
+              '<div style="width:40px;height:40px;border-radius:50%;background:rgba(240,82,93,0.15);color:#F0525D;display:flex;align-items:center;justify-content:center;margin:0 auto;font-weight:bold;font-size:20px;">!</div>' +
+              '<div style="color:#F4F6F8;font-weight:bold;font-size:18px;">Error al cargar</div>' +
+              '<div style="font-size:13px;color:#9AA3AD;">' + (msg || 'Se produjo un error al iniciar los módulos.') + '</div>' +
+              '<button onclick="try{localStorage.clear();}catch(e){}location.reload();" style="margin-top:8px;padding:10px 16px;background:#35D0BA;color:#07150D;border:none;border-radius:8px;font-weight:bold;cursor:pointer;">Limpiar datos y reintentar</button>' +
+              '</div>';
+            document.body.appendChild(errDiv);
+          }
+        }
+      });
+
+      // Timeout safeguard in case mounting stalls
+      setTimeout(function() {
+        var root = document.getElementById('root');
+        if (root && !root.dataset.mounted) {
+          var errDiv = document.getElementById('global-error-fallback');
+          if (!errDiv) {
+            errDiv = document.createElement('div');
+            errDiv.id = 'global-error-fallback';
+            errDiv.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:#17191C;color:#F4F6F8;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;z-index:99999;font-family:sans-serif;';
+            errDiv.innerHTML = '<div style="max-width:420px;background:#202328;padding:24px;border-radius:16px;border:1px solid #30353B;display:flex;flex-direction:column;gap:12px;">' +
+              '<div style="width:40px;height:40px;border-radius:50%;background:rgba(53,208,186,0.15);color:#35D0BA;display:flex;align-items:center;justify-content:center;margin:0 auto;font-weight:bold;font-size:20px;">P</div>' +
+              '<div style="color:#F4F6F8;font-weight:bold;font-size:18px;">Pock - Inicio demorado</div>' +
+              '<div style="font-size:13px;color:#9AA3AD;">La aplicación tardó más de lo esperado en iniciar. Pulsa para recargar.</div>' +
+              '<button onclick="try{localStorage.clear();}catch(e){}location.reload();" style="margin-top:8px;padding:10px 16px;background:#35D0BA;color:#07150D;border:none;border-radius:8px;font-weight:bold;cursor:pointer;">Recargar aplicación</button>' +
+              '</div>';
+            document.body.appendChild(errDiv);
+          }
+        }
+      }, 5000);
+    </script>
+  </head>
+  <body class="bg-[#17191C] text-[#F4F6F8] font-sans antialiased selection:bg-[#35D0BA] selection:text-[#07150D]">
+    <div id="root">
+      <div style="min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; background-color: #17191C; color: #F4F6F8;">
+        <div style="width: 44px; height: 44px; border-radius: 12px; background: linear-gradient(135deg, #35D0BA, #1E9E8D); display: flex; align-items: center; justify-content: center; font-weight: 900; color: #07150D; font-size: 22px;">
+          P
+        </div>
+        <div style="font-weight: 800; font-size: 19px; letter-spacing: -0.02em;">Pock<span style="color: #35D0BA;">.</span></div>
+        <div style="font-size: 13px; color: #9AA3AD;">Cargando tus finanzas...</div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

@@ -1,0 +1,432 @@
+@import "tailwindcss";
+
+/* Base styles */
+:root {
+  color-scheme: dark;
+}
+
+/* Fade-in entrance animation, usada por modales y notificaciones
+   (PresupuestosModal, ResumenView, AhorrosView, EditarMovimientoModal,
+   AbonoModal, PWAInstallButton, App). Antes no existía en ningún lado,
+   así que esos elementos aparecían de golpe sin transición. */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.22s ease-out;
+}
+
+/* Respeta la preferencia del usuario de reducir movimiento */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fadeIn {
+    animation: none;
+  }
+}
+
+/* -------------------------------------------------------------
+   NATIVE APP EXPERIENCE: MOBILE LOCKS, TOUCH & ZOOM RESTRICTIONS
+   - Disables iOS double-tap zoom and pinch-to-zoom
+   - Removes gray tap highlights for authentic native feel
+   - Prevents iOS auto-zoom on focus by enforcing 16px font-size
+   - Supports safe-area-insets on modern bezel-less iPhones / Androids
+---------------------------------------------------------------- */
+html {
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior-y: none;
+  height: 100%;
+}
+
+body {
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+  min-height: 100%;
+  height: 100%;
+}
+
+/* Allow text selection in editable fields and selectable values */
+input, textarea, select {
+  -webkit-user-select: auto !important;
+  user-select: auto !important;
+  touch-action: manipulation !important;
+  /* CRITICAL: Must be at least 16px on mobile to prevent iOS Safari auto-zoom on focus */
+  font-size: 16px !important;
+}
+
+/* Smooth momentum scrolling for containers with invisible scrollbars */
+.overflow-y-auto, .overflow-x-auto, html, body, main {
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+/* Hide scrollbars across all modern browsers, mobile WebKit, and desktop */
+*::-webkit-scrollbar,
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+main::-webkit-scrollbar,
+div::-webkit-scrollbar {
+  display: none !important;
+  width: 0px !important;
+  height: 0px !important;
+  background: transparent !important;
+}
+
+* {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+/* Utility to ensure completely hidden scrollbars */
+.no-scrollbar {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Recharts Tooltip Cursor Background Fix (Dark / Light theme compliant) */
+.recharts-tooltip-cursor,
+rect.recharts-tooltip-cursor,
+.recharts-rectangle.recharts-tooltip-cursor {
+  fill: rgba(53, 208, 186, 0.08) !important;
+  opacity: 1 !important;
+}
+
+html.light .recharts-tooltip-cursor,
+html.light rect.recharts-tooltip-cursor,
+html.light .recharts-rectangle.recharts-tooltip-cursor {
+  fill: rgba(15, 118, 110, 0.08) !important;
+  opacity: 1 !important;
+}
+
+/* Eliminate tap highlight, focus rings and bounding box frames on all charts, SVGs and Recharts containers */
+svg,
+svg:focus,
+svg:active,
+svg:focus-visible,
+.recharts-wrapper,
+.recharts-wrapper:focus,
+.recharts-wrapper:active,
+.recharts-wrapper:focus-visible,
+.recharts-surface,
+.recharts-surface:focus,
+.recharts-surface:active,
+.recharts-responsive-container,
+.recharts-responsive-container:focus,
+.recharts-responsive-container:active,
+.recharts-responsive-container:focus-visible,
+.recharts-wrapper *,
+.recharts-responsive-container * {
+  outline: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+  -webkit-touch-callout: none !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+/* -------------------------------------------------------------
+   LIGHT MODE: EYE-COMFORT PALETTE (MODO DESCANSO VISUAL)
+   Specially tuned for laptop and desktop screens to prevent glare:
+   - Soft, matte slate daylight canvas (#EDF1F5) instead of blinding bright white
+   - Calming structural sidebar (#E2E7ED) with clear boundary definition
+   - Crisp, soft-shadowed white cards (#FFFFFF) with refined slate borders (#D0D7E1)
+   - High-contrast, non-harsh typography: Slate Charcoal (#1A212B) & Calm Muted (#556272)
+   - Deep forest teal buttons & accents (#0F766E) replacing glaring neon cyans
+---------------------------------------------------------------- */
+
+html.light,
+body.light {
+  color-scheme: light;
+  background-color: #EDF1F5 !important;
+  color: #1A212B !important;
+}
+
+/* App Backgrounds */
+html.light body,
+html.light .bg-\[\#17191C\] {
+  background-color: #EDF1F5 !important;
+}
+
+html.light .bg-\[\#0E1012\] {
+  background-color: #DCE2E9 !important;
+}
+
+/* Laptop Desktop Sidebar */
+html.light #app-sidebar,
+html.light .bg-\[\#121316\] {
+  background-color: #E2E7ED !important;
+}
+
+html.light #app-sidebar {
+  border-right-color: #D0D7E1 !important;
+}
+
+html.light #app-sidebar .border-b,
+html.light #app-sidebar .border-t {
+  border-color: #D0D7E1 !important;
+}
+
+/* Sidebar Active Navigation Button */
+html.light #app-sidebar button.bg-\[\#202328\],
+html.light #app-sidebar button[id^="nav-btn-"].bg-\[\#202328\] {
+  background-color: #D3E8E3 !important;
+  color: #0F766E !important;
+  border-color: #2DD4BF !important;
+  font-weight: 700 !important;
+  box-shadow: 0 1px 2px rgba(15, 118, 110, 0.08) !important;
+}
+
+/* Sidebar Inactive Navigation Buttons */
+html.light #app-sidebar button .text-\[\#9AA3AD\] {
+  color: #556272 !important;
+}
+
+html.light #app-sidebar button:hover {
+  background-color: #D7DEE7 !important;
+  color: #111827 !important;
+}
+
+/* Sidebar Colones and Language badge */
+html.light #app-sidebar .text-xs .bg-\[\#202328\] {
+  background-color: #D5DDE6 !important;
+  color: #0F766E !important;
+}
+
+/* Mobile Top Header & Bottom Nav */
+html.light #mobile-header {
+  background-color: #EDF1F5 !important;
+  border-color: #D0D7E1 !important;
+}
+
+html.light #mobile-bottom-nav {
+  background-color: rgba(237, 241, 245, 0.96) !important;
+  border-color: #D0D7E1 !important;
+}
+
+html.light #mobile-bottom-nav button .text-\[\#9AA3AD\] {
+  color: #556272 !important;
+}
+
+html.light #mobile-bottom-nav button.text-\[\#35D0BA\] {
+  color: #0F766E !important;
+  font-weight: 700 !important;
+}
+
+/* Cards & Containers */
+html.light .bg-\[\#202328\] {
+  background-color: #FFFFFF !important;
+  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.06), 0 1px 2px -1px rgba(15, 23, 42, 0.04) !important;
+}
+
+/* Inset pills & sub-containers inside cards */
+html.light .bg-\[\#202328\] .bg-\[\#17191C\],
+html.light .bg-\[\#17191C\].border {
+  background-color: #EEF2F6 !important;
+  border-color: #D4DCE5 !important;
+}
+
+/* Secondary cards / inputs / button backgrounds */
+html.light .bg-\[\#272B30\] {
+  background-color: #F1F4F8 !important;
+}
+
+html.light .bg-\[\#343A42\] {
+  background-color: #E2E8F0 !important;
+}
+
+/* Borders */
+html.light .border-\[\#30353B\] {
+  border-color: #D0D7E1 !important;
+}
+
+html.light .border-\[\#30353B\]\/30,
+html.light .border-\[\#30353B\]\/40 {
+  border-color: rgba(208, 215, 225, 0.5) !important;
+}
+
+html.light .border-\[\#30353B\]\/50,
+html.light .border-\[\#30353B\]\/60 {
+  border-color: #DCE2E9 !important;
+}
+
+html.light .border-\[\#30353B\]\/70,
+html.light .border-\[\#30353B\]\/80 {
+  border-color: #D0D7E1 !important;
+}
+
+/* Typography (Anti-Glare, High-Legibility) */
+html.light .text-\[\#F4F6F8\] {
+  color: #1A212B !important;
+}
+
+html.light .text-\[\#9AA3AD\] {
+  color: #3B4758 !important;
+}
+
+html.light .text-\[\#9AA3AD\]\/70,
+html.light .text-\[\#9AA3AD\]\/60,
+html.light .text-\[\#9AA3AD\]\/50 {
+  color: #4E5D73 !important;
+}
+
+/* Primary Action Buttons (Teal replaced with elegant deep forest teal, white text) */
+html.light .bg-\[\#35D0BA\] {
+  background-color: #0F766E !important;
+  color: #FFFFFF !important;
+}
+
+html.light .bg-\[\#35D0BA\]:hover,
+html.light .hover\:bg-\[\#35D0BA\]\/90:hover,
+html.light .hover\:bg-\[\#2EB39E\]:hover {
+  background-color: #0D9488 !important;
+  color: #FFFFFF !important;
+}
+
+/* Accent Colors - Calibrated for high contrast and visual calmness */
+html.light .text-\[\#35D0BA\] {
+  color: #0F766E !important; /* Deep Forest Teal */
+}
+
+html.light .text-\[\#2BC77B\] {
+  color: #166534 !important; /* Forest Green for Incomes */
+}
+
+html.light .text-\[\#F0525D\] {
+  color: #BE123C !important; /* Crimson Rose for Expenses */
+}
+
+html.light .text-\[\#F4C95D\] {
+  color: #B45309 !important; /* Amber Bronze for Alerts */
+}
+
+html.light .text-\[\#4D9DE0\] {
+  color: #1D4ED8 !important; /* Royal Blue */
+}
+
+/* Accent Background Tints */
+html.light .bg-\[\#35D0BA\]\/15,
+html.light .bg-\[\#35D0BA\]\/20 {
+  background-color: rgba(15, 118, 110, 0.10) !important;
+}
+
+html.light .bg-\[\#2BC77B\]\/15 {
+  background-color: rgba(22, 101, 52, 0.10) !important;
+}
+
+html.light .bg-\[\#F0525D\]\/15,
+html.light .bg-\[\#F0525D\]\/20 {
+  background-color: rgba(190, 18, 60, 0.10) !important;
+}
+
+html.light .bg-\[\#F4C95D\]\/15,
+html.light .bg-\[\#F4C95D\]\/20 {
+  background-color: rgba(180, 83, 9, 0.10) !important;
+}
+
+/* Accent Borders */
+html.light .border-\[\#35D0BA\],
+html.light .border-\[\#35D0BA\]\/30,
+html.light .border-\[\#35D0BA\]\/40,
+html.light .border-\[\#35D0BA\]\/50 {
+  border-color: rgba(15, 118, 110, 0.35) !important;
+}
+
+html.light .border-\[\#2BC77B\]\/30 {
+  border-color: rgba(22, 101, 52, 0.35) !important;
+}
+
+html.light .border-\[\#F0525D\]\/30 {
+  border-color: rgba(190, 18, 60, 0.35) !important;
+}
+
+html.light .border-\[\#F4C95D\]\/30 {
+  border-color: rgba(180, 83, 9, 0.35) !important;
+}
+
+/* Interactive States */
+html.light .hover\:text-\[\#F4F6F8\]:hover {
+  color: #0F172A !important;
+}
+
+html.light .hover\:bg-\[\#202328\]:hover,
+html.light .hover\:bg-\[\#202328\]\/60:hover {
+  background-color: #E2E8F0 !important;
+}
+
+html.light .hover\:bg-\[\#343A42\]:hover {
+  background-color: #DCE2E9 !important;
+}
+
+html.light .active\:bg-\[\#30353B\]:active {
+  background-color: #DCE2E9 !important;
+}
+
+/* Form Inputs & Interactive Controls */
+html.light input,
+html.light select,
+html.light textarea {
+  color: #1A212B !important;
+  background-color: #FFFFFF !important;
+  border-color: #CFD6DF !important;
+}
+
+html.light input:focus,
+html.light select:focus,
+html.light textarea:focus {
+  border-color: #0F766E !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.15) !important;
+}
+
+html.light input::placeholder,
+html.light textarea::placeholder {
+  color: #7E8C9D !important;
+}
+
+/* Modal Backdrops & Overlays */
+html.light .bg-black\/75,
+html.light .bg-black\/80 {
+  background-color: rgba(15, 23, 42, 0.45) !important;
+  backdrop-filter: blur(4px) !important;
+}
+
+/* Charts (Recharts) */
+html.light .recharts-cartesian-grid line {
+  stroke: #D6DEE6 !important;
+}
+
+html.light .recharts-text {
+  fill: #556272 !important;
+}
+
+html.light .recharts-default-tooltip {
+  background-color: #FFFFFF !important;
+  border-color: #D0D7E1 !important;
+  color: #1A212B !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Text Selection */
+html.light ::selection {
+  background-color: #99F6E4;
+  color: #042F2E;
+}

@@ -1,0 +1,8 @@
+{
+  "name": "Pock - Organizador Financiero",
+  "description": "Organizador financiero para control de gastos, ingresos, deudas, presupuesto libre y corte de mes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
