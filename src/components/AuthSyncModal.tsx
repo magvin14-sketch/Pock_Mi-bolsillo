@@ -24,7 +24,8 @@ import {
   clearCustomSupabaseConfig,
 } from '../services/supabase';
 import { SUPABASE_SQL_SCHEMA } from '../services/supabaseSchema';
-import { LanguageCode } from '../types';
+import { LanguageCode, AppData } from '../types';
+import { formatColones } from '../utils';
 
 interface AuthSyncModalProps {
   isOpen: boolean;
@@ -33,6 +34,7 @@ interface AuthSyncModalProps {
   isSyncing: boolean;
   lastSyncTime: string | null;
   syncError: string | null;
+  appData?: AppData;
   onSignIn: (email: string, pass: string) => Promise<{ error?: string }>;
   onSignUp: (email: string, pass: string) => Promise<{ error?: string }>;
   onSignOut: () => Promise<void>;
@@ -47,6 +49,7 @@ export const AuthSyncModal: React.FC<AuthSyncModalProps> = ({
   isSyncing,
   lastSyncTime,
   syncError,
+  appData,
   onSignIn,
   onSignUp,
   onSignOut,
@@ -271,6 +274,45 @@ export const AuthSyncModal: React.FC<AuthSyncModalProps> = ({
                   </span>
                 </div>
               </div>
+
+              {/* Live Sync Status Summary */}
+              {appData && (
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="p-2.5 rounded-xl bg-[#202328] border border-[#30353B]/60">
+                    <p className="text-[10px] text-[#9AA3AD] uppercase tracking-wider font-semibold">
+                      {lang === 'es' ? 'Movimientos' : 'Movements'}
+                    </p>
+                    <p className="text-sm font-bold text-[#F4F6F8] font-mono mt-0.5">
+                      {appData.historial?.length || 0}
+                    </p>
+                    <p className="text-[9px] text-[#35D0BA]">
+                      {lang === 'es' ? 'en movements' : 'in movements'}
+                    </p>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-[#202328] border border-[#30353B]/60">
+                    <p className="text-[10px] text-[#9AA3AD] uppercase tracking-wider font-semibold">
+                      {lang === 'es' ? 'Presupuestos' : 'Budgets'}
+                    </p>
+                    <p className="text-sm font-bold text-[#F4F6F8] font-mono mt-0.5">
+                      {Object.keys(appData.presupuestos_categoria || {}).length}
+                    </p>
+                    <p className="text-[9px] text-[#35D0BA]">
+                      {lang === 'es' ? 'en budgets' : 'in budgets'}
+                    </p>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-[#202328] border border-[#30353B]/60">
+                    <p className="text-[10px] text-[#9AA3AD] uppercase tracking-wider font-semibold">
+                      {lang === 'es' ? 'Saldo Libre' : 'Free Cash'}
+                    </p>
+                    <p className="text-sm font-bold text-[#35D0BA] font-mono mt-0.5 truncate">
+                      {formatColones(appData.dinero_libre)}
+                    </p>
+                    <p className="text-[9px] text-[#35D0BA]">
+                      {lang === 'es' ? 'en user_data' : 'in user_data'}
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Devices Sync Explanation */}
               <div className="p-3.5 rounded-xl bg-[#121316] border border-[#30353B]/50 flex items-center gap-3">

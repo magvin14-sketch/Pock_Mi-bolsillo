@@ -65,12 +65,14 @@ export async function fetchRemoteUserData(userId: string): Promise<RemoteSyncPay
       hora: row.hora,
     }));
 
-    // Transform budgets
+    // Transform budgets (support both categoria/category and monto/amount)
     const budgets: Record<string, number> = {};
     if (Array.isArray(budgetsData)) {
       budgetsData.forEach((b: any) => {
-        if (b.categoria && typeof b.monto !== 'undefined') {
-          budgets[b.categoria] = Number(b.monto);
+        const cat = b.categoria || b.category;
+        const val = typeof b.monto !== 'undefined' ? b.monto : b.amount;
+        if (cat && typeof val !== 'undefined') {
+          budgets[cat] = Number(val);
         }
       });
     }
@@ -78,20 +80,41 @@ export async function fetchRemoteUserData(userId: string): Promise<RemoteSyncPay
     // Transform user_data
     let userData: Partial<AppData> | null = null;
     if (profileData) {
+      const nested = profileData.data || {};
       userData = {
-        dinero_libre: Number(profileData.dinero_libre) || 0,
-        limite_alerta: Number(profileData.limite_alerta) || 0,
-        idioma_actual: profileData.idioma_actual === 'en' ? 'en' : 'es',
-        tema: profileData.tema || 'dark',
-        deudas: Array.isArray(profileData.deudas) ? profileData.deudas : [],
-        metas_ahorro: Array.isArray(profileData.metas_ahorro) ? profileData.metas_ahorro : [],
-        gastos_fijos: Array.isArray(profileData.gastos_fijos) ? profileData.gastos_fijos : [],
-        historial_cortes: Array.isArray(profileData.historial_cortes) ? profileData.historial_cortes : [],
+        dinero_libre: Number(profileData.dinero_libre ?? nested.dinero_libre) || 0,
+        limite_alerta: Number(profileData.limite_alerta ?? nested.limite_alerta) || 0,
+        idioma_actual: (profileData.idioma_actual || nested.idioma_actual) === 'en' ? 'en' : 'es',
+        tema: profileData.tema || nested.tema || 'dark',
+        deudas: Array.isArray(profileData.deudas)
+          ? profileData.deudas
+          : Array.isArray(nested.deudas)
+          ? nested.deudas
+          : [],
+        metas_ahorro: Array.isArray(profileData.metas_ahorro)
+          ? profileData.metas_ahorro
+          : Array.isArray(nested.metas_ahorro)
+          ? nested.metas_ahorro
+          : [],
+        gastos_fijos: Array.isArray(profileData.gastos_fijos)
+          ? profileData.gastos_fijos
+          : Array.isArray(nested.gastos_fijos)
+          ? nested.gastos_fijos
+          : [],
+        historial_cortes: Array.isArray(profileData.historial_cortes)
+          ? profileData.historial_cortes
+          : Array.isArray(nested.historial_cortes)
+          ? nested.historial_cortes
+          : [],
         categorias_personalizadas: Array.isArray(profileData.categorias_personalizadas)
           ? profileData.categorias_personalizadas
+          : Array.isArray(nested.categorias_personalizadas)
+          ? nested.categorias_personalizadas
           : [],
         categorias_ocultas: Array.isArray(profileData.categorias_ocultas)
           ? profileData.categorias_ocultas
+          : Array.isArray(nested.categorias_ocultas)
+          ? nested.categorias_ocultas
           : [],
       };
     }
@@ -282,7 +305,6 @@ export async function pushBudgetsToRemote(
       user_id: userId,
       categoria,
       monto,
-      updated_at: new Date().toISOString(),
     }));
 
     if (rows.length === 0) return true;
@@ -307,7 +329,7 @@ export async function pushUserDataToRemote(userId: string, data: AppData): Promi
   if (!supabase || !userId) return false;
 
   try {
-    const payload = {
+    const payload: any = {
       user_id: userId,
       dinero_libre: data.dinero_libre,
       limite_alerta: data.limite_alerta,
@@ -322,10 +344,14 @@ export async function pushUserDataToRemote(userId: string, data: AppData): Promi
       updated_at: new Date().toISOString(),
     };
 
-    const { error } = await supabase.from('user_data').upsert(payload);
+    const { error } = await supabase.from('user_data').upsert(payload, { onConflict: 'user_id' });
     if (error) {
-      console.warn('Could not push user_data to Supabase:', error.message);
-      return false;
+      // If schema has different primary key, retry with id
+      const retryResult = await supabase.from('user_data').upsert(payload);
+      if (retryResult.error) {
+        console.warn('Could not push user_data to Supabase:', error.message || retryResult.error.message);
+        return false;
+      }
     }
     return true;
   } catch (err) {
@@ -357,6 +383,7 @@ export async function synchronizeFullData(
     const mergedData = remote ? mergeRemoteWithLocal(localData, remote) : localData;
 
     // 3. Push merged movements to remote
+    let movementsFailed = 0;
     if (mergedData.historial.length > 0) {
       const movementRows = mergedData.historial.map((m) => ({
         id: m.id || `${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
@@ -373,17 +400,35 @@ export async function synchronizeFullData(
       // Batch upsert in chunks of 50
       for (let i = 0; i < movementRows.length; i += 50) {
         const chunk = movementRows.slice(i, i + 50);
-        await supabase.from('movements').upsert(chunk);
+        const { error: chunkError } = await supabase.from('movements').upsert(chunk);
+        if (chunkError) {
+          movementsFailed++;
+          console.warn('Error al subir movimientos a Supabase:', chunkError.message);
+        }
       }
     }
 
     // 4. Push budgets
+    let budgetsOk = true;
     if (mergedData.presupuestos_categoria) {
-      await pushBudgetsToRemote(userId, mergedData.presupuestos_categoria);
+      budgetsOk = await pushBudgetsToRemote(userId, mergedData.presupuestos_categoria);
     }
 
     // 5. Push user profile data
-    await pushUserDataToRemote(userId, mergedData);
+    const userDataOk = await pushUserDataToRemote(userId, mergedData);
+
+    if (movementsFailed > 0 || !budgetsOk || !userDataOk) {
+      const fallos: string[] = [];
+      if (movementsFailed > 0) fallos.push('movimientos');
+      if (!budgetsOk) fallos.push('presupuestos');
+      if (!userDataOk) fallos.push('datos generales (saldo, deudas, metas)');
+
+      return {
+        success: false,
+        data: mergedData,
+        error: `No se pudo subir a la nube: ${fallos.join(', ')}. Revisa que las tablas de Supabase existan (usa el script SQL) y que las políticas RLS estén activas.`,
+      };
+    }
 
     const nowFormatted = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 

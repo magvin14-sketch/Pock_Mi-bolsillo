@@ -870,6 +870,7 @@ export default function App() {
         isSyncing={isSyncing}
         lastSyncTime={lastSyncTime}
         syncError={syncError}
+        appData={data}
         onSignIn={signIn}
         onSignUp={signUp}
         onSignOut={signOut}

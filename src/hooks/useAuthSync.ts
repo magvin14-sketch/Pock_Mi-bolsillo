@@ -224,6 +224,10 @@ export function useAuthSync(
           const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
           setLastSyncTime(now);
           localStorage.setItem('pock_last_sync_time', now);
+        } else {
+          setSyncError(
+            'No se pudo guardar este movimiento en la nube. Revisa tu conexión o la configuración de Supabase.'
+          );
         }
       });
     },
@@ -249,9 +253,13 @@ export function useAuthSync(
       if (!user) return;
       if (typeof navigator !== 'undefined' && !navigator.onLine) return;
 
-      pushBudgetsToRemote(user.id, budgets).catch((err) =>
-        console.warn('Error syncing budgets:', err)
-      );
+      pushBudgetsToRemote(user.id, budgets).then((ok) => {
+        if (!ok) {
+          setSyncError(
+            'No se pudieron guardar los presupuestos en la nube. Revisa la configuración de Supabase.'
+          );
+        }
+      });
     },
     [user]
   );
@@ -262,9 +270,13 @@ export function useAuthSync(
       if (!user) return;
       if (typeof navigator !== 'undefined' && !navigator.onLine) return;
 
-      pushUserDataToRemote(user.id, data).catch((err) =>
-        console.warn('Error syncing user data:', err)
-      );
+      pushUserDataToRemote(user.id, data).then((ok) => {
+        if (!ok) {
+          setSyncError(
+            'No se pudieron guardar tus datos (saldo, deudas, metas) en la nube. Revisa la configuración de Supabase.'
+          );
+        }
+      });
     },
     [user]
   );

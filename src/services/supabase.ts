@@ -12,11 +12,13 @@ export function getStoredSupabaseConfig(): SupabaseConfig {
   const envUrl =
     (import.meta.env.VITE_SUPABASE_URL as string) ||
     (import.meta.env.SUPABASE_URL as string) ||
+    (import.meta.env.NEXT_PUBLIC_SUPABASE_URL as string) ||
     '';
 
   const envAnonKey =
     (import.meta.env.VITE_SUPABASE_ANON_KEY as string) ||
     (import.meta.env.SUPABASE_ANON_KEY as string) ||
+    (import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string) ||
     '';
 
   const localUrl = typeof window !== 'undefined' ? localStorage.getItem(CONFIG_STORAGE_KEY_URL) || '' : '';
