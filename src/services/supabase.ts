@@ -3,6 +3,15 @@ import { createClient, SupabaseClient, User, Session } from '@supabase/supabase-
 const CONFIG_STORAGE_KEY_URL = 'pock_supabase_url';
 const CONFIG_STORAGE_KEY_ANON = 'pock_supabase_anon_key';
 
+// Valores por defecto del proyecto de Supabase de Pock.
+// La anon key está diseñada para ser pública (la seguridad real la da el
+// Row Level Security activado en las tablas), así que es seguro incluirla
+// aquí para que cualquier persona que abra la app se conecte automáticamente
+// a la misma base de datos, sin tener que configurar nada.
+const DEFAULT_SUPABASE_URL = 'https://cmedyjeuzpscevuwfitt.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNtZWR5amV1enBzY2V2dXdmaXR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2MzM1NjYsImV4cCI6MjEwNDIwOTU2Nn0.9DwCRF9HatwOOq6OSC1G-Mwlt6_3gELMotMaR7F5VxI';
+
 export interface SupabaseConfig {
   url: string;
   anonKey: string;
@@ -25,8 +34,8 @@ export function getStoredSupabaseConfig(): SupabaseConfig {
   const localAnonKey = typeof window !== 'undefined' ? localStorage.getItem(CONFIG_STORAGE_KEY_ANON) || '' : '';
 
   return {
-    url: (localUrl || envUrl || '').trim(),
-    anonKey: (localAnonKey || envAnonKey || '').trim(),
+    url: (localUrl || envUrl || DEFAULT_SUPABASE_URL || '').trim(),
+    anonKey: (localAnonKey || envAnonKey || DEFAULT_SUPABASE_ANON_KEY || '').trim(),
   };
 }
 

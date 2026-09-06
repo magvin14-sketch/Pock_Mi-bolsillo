@@ -9,21 +9,13 @@ import {
   LogOut,
   AlertCircle,
   Database,
-  Copy,
-  Check,
   Laptop,
   Smartphone,
   Shield,
   KeyRound,
 } from 'lucide-react';
 import { User } from '@supabase/supabase-js';
-import {
-  isSupabaseConfigured,
-  getStoredSupabaseConfig,
-  saveCustomSupabaseConfig,
-  clearCustomSupabaseConfig,
-} from '../services/supabase';
-import { SUPABASE_SQL_SCHEMA } from '../services/supabaseSchema';
+import { isSupabaseConfigured } from '../services/supabase';
 import { LanguageCode, AppData } from '../types';
 import { formatColones } from '../utils';
 
@@ -63,12 +55,6 @@ export const AuthSyncModal: React.FC<AuthSyncModalProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Advanced Supabase configuration toggle
-  const [showConfig, setShowConfig] = useState(false);
-  const [customUrl, setCustomUrl] = useState(() => getStoredSupabaseConfig().url);
-  const [customKey, setCustomKey] = useState(() => getStoredSupabaseConfig().anonKey);
-  const [copiedSql, setCopiedSql] = useState(false);
 
   if (!isOpen) return null;
 
@@ -138,41 +124,6 @@ export const AuthSyncModal: React.FC<AuthSyncModalProps> = ({
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleSaveConfig = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!customUrl.trim() || !customKey.trim()) {
-      setErrorMessage(
-        lang === 'es'
-          ? 'Ingresa tanto la URL como la Anon Key de Supabase'
-          : 'Please enter both Supabase URL and Anon Key'
-      );
-      return;
-    }
-
-    saveCustomSupabaseConfig(customUrl, customKey);
-    setSuccessMessage(
-      lang === 'es'
-        ? 'Configuración guardada. Ahora puedes iniciar sesión.'
-        : 'Configuration saved. You can now sign in.'
-    );
-    setShowConfig(false);
-  };
-
-  const handleClearConfig = () => {
-    clearCustomSupabaseConfig();
-    setCustomUrl('');
-    setCustomKey('');
-    setSuccessMessage(
-      lang === 'es' ? 'Configuración restablecida' : 'Configuration reset'
-    );
-  };
-
-  const handleCopySql = () => {
-    navigator.clipboard.writeText(SUPABASE_SQL_SCHEMA);
-    setCopiedSql(true);
-    setTimeout(() => setCopiedSql(false), 2500);
   };
 
   return (
@@ -380,22 +331,9 @@ export const AuthSyncModal: React.FC<AuthSyncModalProps> = ({
                   </div>
                   <p className="text-[#9AA3AD] leading-relaxed">
                     {lang === 'es'
-                      ? 'Para sincronizar entre laptop y celular, ingresa tus credenciales de Supabase (SUPABASE_URL y SUPABASE_ANON_KEY) en .env o agrégalas abajo.'
-                      : 'To sync across laptop & mobile, provide your Supabase URL & Anon Key in .env or configure them below.'}
+                      ? 'Para sincronizar entre laptop y celular, configura SUPABASE_URL y SUPABASE_ANON_KEY en las variables de entorno del proyecto.'
+                      : 'To sync across laptop & mobile, set SUPABASE_URL and SUPABASE_ANON_KEY in the project environment variables.'}
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => setShowConfig(!showConfig)}
-                    className="text-[#35D0BA] underline hover:text-[#2EB39E] cursor-pointer font-medium"
-                  >
-                    {showConfig
-                      ? lang === 'es'
-                        ? 'Ocultar configuración'
-                        : 'Hide configuration'
-                      : lang === 'es'
-                      ? 'Configurar credenciales en la app →'
-                      : 'Configure credentials in app →'}
-                  </button>
                 </div>
               )}
 
@@ -529,113 +467,6 @@ export const AuthSyncModal: React.FC<AuthSyncModalProps> = ({
               </div>
             </div>
           )}
-
-          {/* Advanced Supabase Config Accordion */}
-          <div className="pt-2 border-t border-[#30353B]/50">
-            <button
-              type="button"
-              onClick={() => setShowConfig(!showConfig)}
-              className="w-full py-1.5 flex items-center justify-between text-xs text-[#9AA3AD] hover:text-[#F4F6F8] transition-colors cursor-pointer"
-            >
-              <span className="flex items-center gap-1.5 font-medium">
-                <Database className="w-3.5 h-3.5 text-[#35D0BA]" />
-                {lang === 'es'
-                  ? 'Configuración de Supabase & Tablas SQL'
-                  : 'Supabase Settings & SQL Schema'}
-              </span>
-              <span className="text-[11px] font-mono">
-                {showConfig ? '▲' : '▼'}
-              </span>
-            </button>
-
-            {showConfig && (
-              <div className="mt-3 p-3.5 rounded-xl bg-[#121316] border border-[#30353B] space-y-3 animate-fadeIn">
-                <form onSubmit={handleSaveConfig} className="space-y-3">
-                  <div>
-                    <label className="block text-[11px] font-medium text-[#9AA3AD] mb-1">
-                      SUPABASE_URL
-                    </label>
-                    <input
-                      type="text"
-                      value={customUrl}
-                      onChange={(e) => setCustomUrl(e.target.value)}
-                      placeholder="https://xyzproject.supabase.co"
-                      className="w-full bg-[#17191C] border border-[#30353B] rounded-lg px-2.5 py-1.5 text-xs text-[#F4F6F8] font-mono focus:border-[#35D0BA] focus:outline-hidden"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-medium text-[#9AA3AD] mb-1">
-                      SUPABASE_ANON_KEY
-                    </label>
-                    <input
-                      type="password"
-                      value={customKey}
-                      onChange={(e) => setCustomKey(e.target.value)}
-                      placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                      className="w-full bg-[#17191C] border border-[#30353B] rounded-lg px-2.5 py-1.5 text-xs text-[#F4F6F8] font-mono focus:border-[#35D0BA] focus:outline-hidden"
-                    />
-                  </div>
-
-                  <div className="flex gap-2 pt-1">
-                    <button
-                      type="submit"
-                      className="flex-1 py-1.5 px-3 bg-[#202328] hover:bg-[#35D0BA] text-[#F4F6F8] hover:text-[#07150D] border border-[#35D0BA]/30 hover:border-[#35D0BA] text-xs font-semibold rounded-lg transition-colors cursor-pointer"
-                    >
-                      {lang === 'es' ? 'Guardar Conexión' : 'Save Connection'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleClearConfig}
-                      className="py-1.5 px-3 bg-[#202328] text-[#9AA3AD] hover:text-red-400 text-xs rounded-lg border border-[#30353B] cursor-pointer"
-                    >
-                      {lang === 'es' ? 'Limpiar' : 'Reset'}
-                    </button>
-                  </div>
-                </form>
-
-                {/* SQL Copy Box */}
-                <div className="pt-2 border-t border-[#30353B]/50 space-y-1.5">
-                  <div className="flex items-center justify-between text-[11px] text-[#9AA3AD]">
-                    <span>
-                      {lang === 'es'
-                        ? 'Script SQL para crear tablas en Supabase:'
-                        : 'SQL Script to create tables in Supabase:'}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleCopySql}
-                      className="flex items-center gap-1 text-[#35D0BA] hover:underline cursor-pointer"
-                    >
-                      {copiedSql ? (
-                        <>
-                          <Check className="w-3 h-3 text-emerald-400" />
-                          <span className="text-emerald-400">
-                            {lang === 'es' ? '¡Copiado!' : 'Copied!'}
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3 h-3" />
-                          <span>
-                            {lang === 'es' ? 'Copiar SQL' : 'Copy SQL'}
-                          </span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                  <pre className="p-2 bg-[#0C0D0F] border border-[#30353B]/70 rounded-lg text-[10px] font-mono text-[#35D0BA]/90 max-h-32 overflow-y-auto leading-tight select-all">
-                    {SUPABASE_SQL_SCHEMA}
-                  </pre>
-                  <p className="text-[10px] text-[#9AA3AD]/70 leading-tight">
-                    {lang === 'es'
-                      ? 'Pega este script en el SQL Editor de tu proyecto en Supabase para crear las tablas "movements", "budgets" y "user_data" con sus políticas de seguridad (RLS).'
-                      : 'Paste this in your Supabase SQL Editor to create movements, budgets, and user_data with Row Level Security.'}
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
         </div>
       </div>
     </div>

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Debt, LanguageCode } from '../types';
 import { TEXTOS } from '../config';
-import { formatColones } from '../utils';
+import { formatColones, parseMoneyInput } from '../utils';
 import { X, Check } from 'lucide-react';
 import { ModalPortal } from './ModalPortal';
 
@@ -30,8 +30,8 @@ export const AbonoModal: React.FC<AbonoModalProps> = ({
     e.preventDefault();
     setError(null);
 
-    const val = parseFloat(monto.replace(/,/g, '.'));
-    if (isNaN(val) || val <= 0) {
+    const val = parseMoneyInput(monto) ?? NaN;
+    if (isNaN(val) || val <= 0 || val > pendiente || val > dineroLibre) {
       setError(t('aviso_monto'));
       return;
     }

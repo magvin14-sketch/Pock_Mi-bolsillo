@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { LanguageCode } from '../types';
 import { CATEGORIAS, CATEGORIA_COLOR, TEXTOS } from '../config';
-import { formatColones, getAllCategories, getCategoryLabel } from '../utils';
+import { parseMoneyInput,  formatColones, getAllCategories, getCategoryLabel } from '../utils';
 import { X, Check, SlidersHorizontal } from 'lucide-react';
 import { ModalPortal } from './ModalPortal';
 
@@ -51,7 +51,7 @@ export const PresupuestosModal: React.FC<PresupuestosModalProps> = ({
     const result: Record<string, number> = {};
     for (const [cat, valStr] of Object.entries(valores)) {
       const stringVal = typeof valStr === 'string' ? valStr : String(valStr);
-      const parsed = parseFloat(stringVal.replace(/,/g, '.'));
+      const parsed = parseMoneyInput(stringVal) ?? NaN;
       if (!isNaN(parsed) && parsed > 0) {
         result[cat] = parsed;
       }

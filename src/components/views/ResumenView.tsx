@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Movement, FixedExpense, CycleHistoryEntry, LanguageCode } from '../../types';
 import { CATEGORIAS, TEXTOS } from '../../config';
-import { formatColones, generateId, getCategoryLabel } from '../../utils';
+import { formatColones, generateId, getCategoryLabel, parseMoneyInput } from '../../utils';
 import { RotateCcw, Check, AlertTriangle, TrendingUp, TrendingDown, PiggyBank, PieChart, Repeat, Plus, Trash2, CalendarCheck2 } from 'lucide-react';
 import { FinanceCharts } from '../FinanceCharts';
 import { ModalPortal } from '../ModalPortal';
@@ -93,7 +93,7 @@ export const ResumenView: React.FC<ResumenViewProps> = ({
     e.preventDefault();
     setError(null);
 
-    const val = parseFloat(nuevoSaldo.replace(/,/g, ''));
+    const val = parseMoneyInput(nuevoSaldo) ?? NaN;
     if (isNaN(val) || val < 0) {
       setError(t('corte_error'));
       return;
@@ -103,7 +103,7 @@ export const ResumenView: React.FC<ResumenViewProps> = ({
   };
 
   const handleConfirmarCorte = () => {
-    const val = parseFloat(nuevoSaldo.replace(/,/g, ''));
+    const val = parseMoneyInput(nuevoSaldo) ?? NaN;
     onEjecutarCorte(val, aplicarFijosEnCorte);
     setMostrarModalConfirm(false);
     setMostrarForm(false);
@@ -126,7 +126,7 @@ export const ResumenView: React.FC<ResumenViewProps> = ({
   const handleAgregarFijo = (e: React.FormEvent) => {
     e.preventDefault();
     const cleanDesc = nuevoFijoDesc.trim();
-    const num = parseFloat(nuevoFijoMonto.replace(/,/g, '.'));
+    const num = parseMoneyInput(nuevoFijoMonto) ?? NaN;
     if (!cleanDesc || isNaN(num) || num <= 0) return;
 
     const nuevo: FixedExpense = {

@@ -1,23 +1,23 @@
 import React, { useState, useMemo } from 'react';
 import { Movement, MovementType, LanguageCode } from '../types';
 import { CATEGORIAS, TEXTOS } from '../config';
-import { getAllCategories, getCategoryLabel } from '../utils';
+import { getAllCategories, getCategoryLabel, parseMoneyInput } from '../utils';
 import { X, Check } from 'lucide-react';
 import { ModalPortal } from './ModalPortal';
 
 interface EditarMovimientoModalProps {
   movimiento: Movement;
-  index: number;
+  movementId: string;
   categoriasPersonalizadas?: string[];
   categoriasOcultas?: string[];
   lang: LanguageCode;
-  onSave: (index: number, updatedMovement: Movement) => void;
+  onSave: (movementId: string, updatedMovement: Movement) => void;
   onClose: () => void;
 }
 
 export const EditarMovimientoModal: React.FC<EditarMovimientoModalProps> = ({
   movimiento,
-  index,
+  movementId,
   categoriasPersonalizadas = [],
   categoriasOcultas = [],
   lang,
@@ -48,13 +48,13 @@ export const EditarMovimientoModal: React.FC<EditarMovimientoModalProps> = ({
       return;
     }
 
-    const cleanMonto = parseFloat(monto.replace(/,/g, '.'));
+    const cleanMonto = parseMoneyInput(monto) ?? NaN;
     if (isNaN(cleanMonto) || cleanMonto <= 0) {
       setError(t('aviso_monto'));
       return;
     }
 
-    onSave(index, {
+    onSave(movementId, {
       id: movimiento.id,
       desc: cleanDesc,
       monto: cleanMonto,

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Debt, DebtType, LanguageCode } from '../../types';
 import { DEUDA_TIPOS, TEXTOS } from '../../config';
-import { formatColones } from '../../utils';
+import { formatColones, parseMoneyInput } from '../../utils';
 import { CheckCircle2, CreditCard, Banknote, Users, Trash2, Plus, Calendar } from 'lucide-react';
 import { ConfirmModal } from '../ConfirmModal';
 
@@ -42,7 +42,7 @@ export const DeudasView: React.FC<DeudasViewProps> = ({
       return;
     }
 
-    const totalNum = parseFloat(montoTotal.replace(/,/g, '.'));
+    const totalNum = parseMoneyInput(montoTotal) ?? NaN;
     if (isNaN(totalNum) || totalNum <= 0) {
       setErrorMsg(t('aviso_deuda_monto'));
       return;
@@ -50,7 +50,7 @@ export const DeudasView: React.FC<DeudasViewProps> = ({
 
     let pagadoNum = 0;
     if (montoPagado.trim()) {
-      pagadoNum = parseFloat(montoPagado.replace(/,/g, '.'));
+      pagadoNum = parseMoneyInput(montoPagado) ?? NaN;
       if (isNaN(pagadoNum) || pagadoNum < 0) {
         pagadoNum = 0;
       }
@@ -152,7 +152,7 @@ export const DeudasView: React.FC<DeudasViewProps> = ({
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-bold text-[#9AA3AD] mb-1">
+                <label className="flex items-end min-h-[2rem] text-xs font-bold text-[#9AA3AD] mb-1 leading-tight">
                   {t('deuda_monto_total')}
                 </label>
                 <div className="relative">
@@ -172,7 +172,7 @@ export const DeudasView: React.FC<DeudasViewProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#9AA3AD] mb-1">
+                <label className="flex items-end min-h-[2rem] text-xs font-bold text-[#9AA3AD] mb-1 leading-tight">
                   {t('deuda_monto_pagado')}
                 </label>
                 <div className="relative">

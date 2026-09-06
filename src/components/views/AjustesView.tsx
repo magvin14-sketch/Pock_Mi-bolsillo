@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { AppData, LanguageCode, ThemeMode } from '../../types';
 import { TEXTOS, CATEGORIA_COLOR } from '../../config';
-import { formatColones, getAllCategories, BASE_CATEGORIES, getCategoryLabel } from '../../utils';
+import { formatColones, getAllCategories, parseMoneyInput, BASE_CATEGORIES, getCategoryLabel } from '../../utils';
 import { BellRing, Languages, Database, Download, Upload, Check, AlertTriangle, RefreshCw, Moon, Sun, Monitor, Tag, Plus, Trash2, Smartphone, Share2, RotateCcw, Undo2, ChevronDown, ChevronUp, Cloud, Laptop } from 'lucide-react';
 import { PWAInstallButton } from '../PWAInstallButton';
 import { ConfirmModal } from '../ConfirmModal';
@@ -116,7 +116,7 @@ export const AjustesView: React.FC<AjustesViewProps> = ({
     setErrorLimite(null);
     setMensajeLimite(null);
 
-    const val = parseFloat(limiteInput.replace(/,/g, '.'));
+    const val = parseMoneyInput(limiteInput) ?? NaN;
     if (isNaN(val) || val < 0) {
       setErrorLimite(t('limite_error'));
       return;
@@ -155,6 +155,9 @@ export const AjustesView: React.FC<AjustesViewProps> = ({
             deudas: Array.isArray(parsed.deudas) ? parsed.deudas : [],
             metas_ahorro: Array.isArray(parsed.metas_ahorro) ? parsed.metas_ahorro : [],
             categorias_personalizadas: Array.isArray(parsed.categorias_personalizadas) ? parsed.categorias_personalizadas : [],
+            categorias_ocultas: Array.isArray(parsed.categorias_ocultas) ? parsed.categorias_ocultas : [],
+            deleted_movements: Array.isArray(parsed.deleted_movements) ? parsed.deleted_movements : [],
+            updated_at: new Date().toISOString(),
             presupuestos_categoria: parsed.presupuestos_categoria || {},
             gastos_fijos: Array.isArray(parsed.gastos_fijos) ? parsed.gastos_fijos : [],
             historial_cortes: Array.isArray(parsed.historial_cortes) ? parsed.historial_cortes : [],

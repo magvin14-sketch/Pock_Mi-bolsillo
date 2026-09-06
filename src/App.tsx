@@ -1,8 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { AppData, Debt, Movement, MovementType, ViewType, LanguageCode, ThemeMode, FixedExpense, CycleHistoryEntry, SavingsGoal } from './types';
+import { AppData, Movement, ViewType, LanguageCode, ThemeMode } from './types';
 import { INITIAL_DATA, TEXTOS } from './config';
-import { loadStoredData, saveStoredData, getCurrentTimestamp, createBaseMovement, generateId, BASE_CATEGORIES } from './utils';
+import { loadStoredData, saveStoredData, BASE_CATEGORIES } from './utils';
 import { useTheme } from './hooks/useTheme';
+import { useMovements } from './hooks/useMovements';
+import { useSavings } from './hooks/useSavings';
+import { useDebts } from './hooks/useDebts';
+import { useMonthCut } from './hooks/useMonthCut';
 import { Sidebar } from './components/Sidebar';
 import { InicioView } from './components/views/InicioView';
 import { HistorialView } from './components/views/HistorialView';
@@ -61,11 +65,6 @@ export default function App() {
     });
   }, []);
 
-  const [deudaParaAbono, setDeudaParaAbono] = useState<Debt | null>(null);
-  const [deletedMovement, setDeletedMovement] = useState<{
-    movement: Movement;
-    originalIndex: number;
-  } | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   const handleDataFromCloud = useCallback((cloudData: AppData) => {
@@ -88,6 +87,13 @@ export default function App() {
     notifyBudgetsChanged,
     notifyUserDataChanged,
   } = useAuthSync(data, handleDataFromCloud);
+
+  const commitData = useCallback((updater: AppData | ((prev: AppData) => AppData)) => {
+    setData((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      return { ...next, updated_at: new Date().toISOString() };
+    });
+  }, []);
 
   const { theme, effectiveTheme, setTheme } = useTheme(data.tema);
   const [isInsideIframe, setIsInsideIframe] = useState(false);
@@ -205,134 +211,30 @@ export default function App() {
   const handleThemeChange = useCallback(
     (newTheme: ThemeMode) => {
       setTheme(newTheme);
-      setData((prev) => ({ ...prev, tema: newTheme }));
+      commitData((prev) => ({ ...prev, tema: newTheme }));
     },
     [setTheme]
   );
 
-  // Add movement (Gasto or Ingreso)
-  const handleAddMovement = useCallback(
-    (desc: string, monto: number, categoria: string, tipo: MovementType) => {
-      const { fecha, hora } = getCurrentTimestamp();
-      const nuevoMovimiento: Movement = {
-        id: generateId(),
-        desc,
-        categoria: tipo === 'gasto' ? categoria : null,
-        tipo,
-        monto,
-        fecha,
-        hora,
-      };
-
-      setData((prev) => {
-        const delta = tipo === 'gasto' ? -monto : monto;
-        const updatedData: AppData = {
-          ...prev,
-          dinero_libre: prev.dinero_libre + delta,
-          historial: [...prev.historial, nuevoMovimiento],
-        };
-        return updatedData;
-      });
-
-      notifyMovementAdded(nuevoMovimiento);
-    },
-    [notifyMovementAdded]
-  );
-
-  // Edit movement
-  const handleEditMovement = useCallback(
-    (indexToEdit: number, updatedMovement: Movement) => {
-      setData((prev) => {
-        const oldMov = prev.historial[indexToEdit];
-        if (!oldMov) return prev;
-
-        // Calculate delta to adjust dinero_libre
-        let delta = 0;
-        // Undo old movement
-        if (oldMov.tipo === 'gasto') delta += oldMov.monto;
-        else if (oldMov.tipo === 'ingreso') delta -= oldMov.monto;
-        else if (oldMov.tipo === 'base') delta -= oldMov.monto;
-
-        // Apply new movement
-        if (updatedMovement.tipo === 'gasto') delta -= updatedMovement.monto;
-        else if (updatedMovement.tipo === 'ingreso') delta += updatedMovement.monto;
-        else if (updatedMovement.tipo === 'base') delta += updatedMovement.monto;
-
-        const updatedHistorial = [...prev.historial];
-        updatedHistorial[indexToEdit] = updatedMovement;
-
-        return {
-          ...prev,
-          dinero_libre: prev.dinero_libre + delta,
-          historial: updatedHistorial,
-        };
-      });
-
-      notifyMovementAdded(updatedMovement);
-    },
-    [notifyMovementAdded]
-  );
-
-  // Delete movement
-  const handleDeleteMovement = useCallback((indexToDelete: number) => {
-    setData((prev) => {
-      const mov = prev.historial[indexToDelete];
-      if (!mov) return prev;
-
-      setDeletedMovement({ movement: mov, originalIndex: indexToDelete });
-
-      // Adjust balance back if removing a gasto or ingreso
-      let adjustedBalance = prev.dinero_libre;
-      if (mov.tipo === 'gasto') {
-        adjustedBalance += mov.monto;
-      } else if (mov.tipo === 'ingreso') {
-        adjustedBalance -= mov.monto;
-      }
-
-      if (mov.id) {
-        notifyMovementDeleted(mov.id);
-      }
-
-      const updatedHistorial = prev.historial.filter((_, idx) => idx !== indexToDelete);
-      return {
-        ...prev,
-        dinero_libre: adjustedBalance,
-        historial: updatedHistorial,
-      };
-    });
-  }, [notifyMovementDeleted]);
-
-  // Undo delete movement
-  const handleUndoDeleteMovement = useCallback(() => {
-    if (!deletedMovement) return;
-    const { movement, originalIndex } = deletedMovement;
-    setData((prev) => {
-      const nextHistorial = [...prev.historial];
-      const insertAt = Math.min(originalIndex, nextHistorial.length);
-      nextHistorial.splice(insertAt, 0, movement);
-
-      let adjustedBalance = prev.dinero_libre;
-      if (movement.tipo === 'gasto') {
-        adjustedBalance -= movement.monto;
-      } else if (movement.tipo === 'ingreso') {
-        adjustedBalance += movement.monto;
-      }
-
-      return {
-        ...prev,
-        dinero_libre: adjustedBalance,
-        historial: nextHistorial,
-      };
-    });
-
-    notifyMovementAdded(movement);
-    setDeletedMovement(null);
-  }, [deletedMovement, notifyMovementAdded]);
+  // Movement CRUD (add / edit / delete / undo) — see hooks/useMovements.ts
+  const {
+    deletedMovement,
+    setDeletedMovement,
+    handleAddMovement,
+    handleEditMovement,
+    handleDeleteMovement,
+    handleUndoDeleteMovement,
+  } = useMovements({
+    historial: data.historial,
+    commitData,
+    notifyMovementAdded,
+    notifyMovementDeleted,
+  });
 
   // Save category budget caps
   const handleSavePresupuestos = useCallback(
     (nuevosPresupuestos: Record<string, number>) => {
-      setData((prev) => ({
+      commitData((prev) => ({
         ...prev,
         presupuestos_categoria: nuevosPresupuestos,
       }));
@@ -341,300 +243,29 @@ export default function App() {
     [notifyBudgetsChanged]
   );
 
-  // Update fixed expense templates
-  const handleUpdateGastosFijos = useCallback((gastos: FixedExpense[]) => {
-    setData((prev) => ({
-      ...prev,
-      gastos_fijos: gastos,
-    }));
-  }, []);
+  // Month cut (Corte de Mes) + fixed-expense logic — see hooks/useMonthCut.ts
+  const { handleUpdateGastosFijos, handleAplicarGastosFijosManual, handleEjecutarCorte } = useMonthCut({
+    commitData,
+    saldoBaseLabel: t('saldo_base'),
+  });
 
-  // Apply active fixed expenses immediately
-  const handleAplicarGastosFijosManual = useCallback(() => {
-    setData((prev) => {
-      const activos = (prev.gastos_fijos || []).filter((g) => g.activo);
-      if (activos.length === 0) return prev;
+  // Debt (deudas) logic — see hooks/useDebts.ts
+  const {
+    deudaParaAbono,
+    setDeudaParaAbono,
+    handleRegistrarDeuda,
+    handleConfirmarAbono,
+    handleEliminarDeuda,
+  } = useDebts({ commitData });
 
-      const { fecha, hora } = getCurrentTimestamp();
-      let suma = 0;
-      const nuevosMovs: Movement[] = activos.map((fijo) => {
-        suma += fijo.monto;
-        return {
-          id: generateId(),
-          desc: fijo.desc,
-          categoria: fijo.categoria,
-          tipo: 'gasto',
-          monto: fijo.monto,
-          fecha,
-          hora,
-        };
-      });
-
-      return {
-        ...prev,
-        dinero_libre: prev.dinero_libre - suma,
-        historial: [...prev.historial, ...nuevosMovs],
-      };
-    });
-  }, []);
-
-  // Month Cut (Corte de Mes) with snapshot history and optional auto-recurring expenses
-  const handleEjecutarCorte = useCallback(
-    (nuevoSaldoBase: number, aplicarFijos: boolean) => {
-      const baseLabel = t('saldo_base');
-      const primerMov = createBaseMovement(nuevoSaldoBase, baseLabel);
-
-      setData((prev) => {
-        // Calculate snapshot of closing cycle
-        let totalIngresos = 0;
-        let totalGastos = 0;
-        let saldoInicial = 0;
-        for (const m of prev.historial) {
-          if (m.tipo === 'base') saldoInicial += m.monto;
-          else if (m.tipo === 'ingreso') totalIngresos += m.monto;
-          else if (m.tipo === 'gasto') totalGastos += m.monto;
-        }
-
-        const { fecha } = getCurrentTimestamp();
-        const snapshot: CycleHistoryEntry = {
-          id: generateId(),
-          fechaCorte: fecha,
-          saldoInicial,
-          saldoFinal: prev.dinero_libre,
-          totalIngresos,
-          totalGastos,
-          ahorroNeto: saldoInicial + totalIngresos - totalGastos,
-          totalMovimientos: prev.historial.length,
-        };
-
-        const nuevoHistorial: Movement[] = [primerMov];
-        let saldoActualizado = nuevoSaldoBase;
-
-        // Apply active fixed expenses if checked
-        if (aplicarFijos) {
-          const activos = (prev.gastos_fijos || []).filter((g) => g.activo);
-          const { fecha: f, hora: h } = getCurrentTimestamp();
-          for (const fijo of activos) {
-            saldoActualizado -= fijo.monto;
-            nuevoHistorial.push({
-              id: generateId(),
-              desc: fijo.desc,
-              categoria: fijo.categoria,
-              tipo: 'gasto',
-              monto: fijo.monto,
-              fecha: f,
-              hora: h,
-            });
-          }
-        }
-
-        return {
-          ...prev,
-          dinero_libre: saldoActualizado,
-          historial: nuevoHistorial,
-          historial_cortes: [...(prev.historial_cortes || []), snapshot],
-        };
-      });
-    },
-    [t]
-  );
-
-  // Register debt
-  const handleRegistrarDeuda = useCallback(
-    (nueva: Omit<Debt, 'id' | 'pagada'>) => {
-      const { fecha, hora } = getCurrentTimestamp();
-      const id = `${fecha.replace(/\//g, '')}${hora.replace(/:/g, '')}${Math.floor(Math.random() * 1000)}`;
-
-      const debtRecord: Debt = {
-        ...nueva,
-        id,
-        pagada: nueva.monto_pagado >= nueva.monto_total,
-      };
-
-      setData((prev) => ({
-        ...prev,
-        deudas: [...prev.deudas, debtRecord],
-      }));
-    },
-    []
-  );
-
-  // Confirm debt payment
-  const handleConfirmarAbono = useCallback(
-    (deudaId: string, montoAbono: number) => {
-      const { fecha, hora } = getCurrentTimestamp();
-
-      setData((prev) => {
-        let acreedorName = 'Deuda';
-        const updatedDeudas = prev.deudas.map((d) => {
-          if (d.id === deudaId) {
-            acreedorName = d.acreedor;
-            const nuevoPagado = d.monto_pagado + montoAbono;
-            return {
-              ...d,
-              monto_pagado: nuevoPagado,
-              pagada: nuevoPagado >= d.monto_total,
-            };
-          }
-          return d;
-        });
-
-        // Add expense movement for this payment
-        const movimientoAbono: Movement = {
-          id: generateId(),
-          desc: `${acreedorName} (Abono)`,
-          categoria: 'deuda',
-          tipo: 'gasto',
-          monto: montoAbono,
-          fecha,
-          hora,
-        };
-
-        return {
-          ...prev,
-          dinero_libre: prev.dinero_libre - montoAbono,
-          historial: [...prev.historial, movimientoAbono],
-          deudas: updatedDeudas,
-        };
-      });
-
-      setDeudaParaAbono(null);
-    },
-    []
-  );
-
-  // Delete debt
-  const handleEliminarDeuda = useCallback((id: string) => {
-    setData((prev) => ({
-      ...prev,
-      deudas: prev.deudas.filter((d) => d.id !== id),
-    }));
-  }, []);
-
-  // Save / Update savings goal
-  const handleSaveGoal = useCallback((goal: SavingsGoal) => {
-    setData((prev) => {
-      const metas = prev.metas_ahorro || [];
-      const idx = metas.findIndex((m) => m.id === goal.id);
-      let updatedMetas: SavingsGoal[];
-      if (idx >= 0) {
-        updatedMetas = [...metas];
-        updatedMetas[idx] = goal;
-      } else {
-        updatedMetas = [...metas, goal];
-      }
-      return {
-        ...prev,
-        metas_ahorro: updatedMetas,
-      };
-    });
-  }, []);
-
-  // Delete savings goal
-  const handleDeleteGoal = useCallback((goalId: string) => {
-    setData((prev) => ({
-      ...prev,
-      metas_ahorro: (prev.metas_ahorro || []).filter((m) => m.id !== goalId),
-    }));
-  }, []);
-
-  // Deposit into savings goal
-  const handleDepositToGoal = useCallback(
-    (goalId: string, amount: number, deductFromFreeMoney: boolean) => {
-      const { fecha, hora } = getCurrentTimestamp();
-      setData((prev) => {
-        let goalName = 'Meta de Ahorro';
-        const updatedMetas = (prev.metas_ahorro || []).map((m) => {
-          if (m.id === goalId) {
-            goalName = m.nombre;
-            const nuevoAhorrado = (m.ahorrado || 0) + amount;
-            return {
-              ...m,
-              ahorrado: nuevoAhorrado,
-              completada: nuevoAhorrado >= m.meta,
-            };
-          }
-          return m;
-        });
-
-        let nuevoDineroLibre = prev.dinero_libre;
-        let nuevoHistorial = prev.historial;
-
-        if (deductFromFreeMoney) {
-          nuevoDineroLibre -= amount;
-          const movAhorro: Movement = {
-            id: generateId(),
-            desc: `${goalName} (Aporte Ahorro)`,
-            categoria: 'otros',
-            tipo: 'gasto',
-            monto: amount,
-            fecha,
-            hora,
-          };
-          nuevoHistorial = [...prev.historial, movAhorro];
-        }
-
-        return {
-          ...prev,
-          dinero_libre: nuevoDineroLibre,
-          historial: nuevoHistorial,
-          metas_ahorro: updatedMetas,
-        };
-      });
-    },
-    []
-  );
-
-  // Withdraw from savings goal
-  const handleWithdrawFromGoal = useCallback(
-    (goalId: string, amount: number, returnToFreeMoney: boolean) => {
-      const { fecha, hora } = getCurrentTimestamp();
-      setData((prev) => {
-        let goalName = 'Meta de Ahorro';
-        const updatedMetas = (prev.metas_ahorro || []).map((m) => {
-          if (m.id === goalId) {
-            goalName = m.nombre;
-            const nuevoAhorrado = Math.max(0, (m.ahorrado || 0) - amount);
-            return {
-              ...m,
-              ahorrado: nuevoAhorrado,
-              completada: nuevoAhorrado >= m.meta,
-            };
-          }
-          return m;
-        });
-
-        let nuevoDineroLibre = prev.dinero_libre;
-        let nuevoHistorial = prev.historial;
-
-        if (returnToFreeMoney) {
-          nuevoDineroLibre += amount;
-          const movRetiro: Movement = {
-            id: generateId(),
-            desc: `${goalName} (Retiro Ahorro)`,
-            categoria: null,
-            tipo: 'ingreso',
-            monto: amount,
-            fecha,
-            hora,
-          };
-          nuevoHistorial = [...prev.historial, movRetiro];
-        }
-
-        return {
-          ...prev,
-          dinero_libre: nuevoDineroLibre,
-          historial: nuevoHistorial,
-          metas_ahorro: updatedMetas,
-        };
-      });
-    },
-    []
-  );
+  // Savings goal (metas de ahorro) logic — see hooks/useSavings.ts
+  const { handleSaveGoal, handleDeleteGoal, handleDepositToGoal, handleWithdrawFromGoal } = useSavings({
+    commitData,
+  });
 
   // Add category (custom or restore deleted)
   const handleAddCustomCategory = useCallback((categoria: string) => {
-    setData((prev) => {
+    commitData((prev) => {
       const clean = categoria.trim();
       if (!clean) return prev;
       const existentes = prev.categorias_personalizadas || [];
@@ -658,7 +289,7 @@ export default function App() {
 
   // Delete category (any category, default or custom)
   const handleDeleteCategory = useCallback((categoria: string) => {
-    setData((prev) => {
+    commitData((prev) => {
       const clean = categoria.toLowerCase();
       const nextPersonalizadas = (prev.categorias_personalizadas || []).filter(
         (c) => c.toLowerCase() !== clean
@@ -676,7 +307,7 @@ export default function App() {
 
   // Restore individual deleted default category
   const handleRestoreCategory = useCallback((categoria: string) => {
-    setData((prev) => {
+    commitData((prev) => {
       const clean = categoria.toLowerCase();
       return {
         ...prev,
@@ -689,7 +320,7 @@ export default function App() {
 
   // Restore all default categories
   const handleRestoreAllDefaultCategories = useCallback(() => {
-    setData((prev) => ({
+    commitData((prev) => ({
       ...prev,
       categorias_ocultas: [],
     }));
@@ -697,7 +328,7 @@ export default function App() {
 
   // Save low balance alert threshold
   const handleGuardarLimite = useCallback((nuevoLimite: number) => {
-    setData((prev) => ({
+    commitData((prev) => ({
       ...prev,
       limite_alerta: nuevoLimite,
     }));
@@ -705,7 +336,7 @@ export default function App() {
 
   // Change app language
   const handleChangeLang = useCallback((newLang: LanguageCode) => {
-    setData((prev) => ({
+    commitData((prev) => ({
       ...prev,
       idioma_actual: newLang,
     }));
@@ -713,12 +344,12 @@ export default function App() {
 
   // Import full JSON
   const handleImportData = useCallback((imported: AppData) => {
-    setData(imported);
+    commitData(imported);
   }, []);
 
   // Reset to default
   const handleResetDefault = useCallback(() => {
-    setData(INITIAL_DATA);
+    commitData({ ...INITIAL_DATA, historial: [], deudas: [], metas_ahorro: [], presupuestos_categoria: {}, gastos_fijos: [], historial_cortes: [], categorias_personalizadas: [], categorias_ocultas: [], deleted_movements: [] });
   }, []);
 
   const mainViews = (

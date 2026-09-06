@@ -11,8 +11,8 @@ interface HistorialViewProps {
   categoriasPersonalizadas?: string[];
   categoriasOcultas?: string[];
   lang: LanguageCode;
-  onDeleteMovement: (index: number) => void;
-  onEditMovement: (index: number, updatedMovement: Movement) => void;
+  onDeleteMovement: (movementId: string) => void;
+  onEditMovement: (movementId: string, updatedMovement: Movement) => void;
 }
 
 export const HistorialView: React.FC<HistorialViewProps> = ({
@@ -32,15 +32,15 @@ export const HistorialView: React.FC<HistorialViewProps> = ({
   const [filtro, setFiltro] = useState<FilterType>('todos');
   const [busqueda, setBusqueda] = useState('');
   const [filtroCategoria, setFiltroCategoria] = useState<string>('todas');
-  const [movimientoParaEditar, setMovimientoParaEditar] = useState<{ mov: Movement; index: number } | null>(null);
-  const [movimientoParaEliminar, setMovimientoParaEliminar] = useState<{ index: number; desc: string; monto: number } | null>(null);
+  const [movimientoParaEditar, setMovimientoParaEditar] = useState<{ mov: Movement; id: string } | null>(null);
+  const [movimientoParaEliminar, setMovimientoParaEliminar] = useState<{ id: string; desc: string; monto: number } | null>(null);
 
   // Filter movements
   const filteredMovements = useMemo(() => {
     const term = busqueda.trim().toLowerCase();
 
     // Map to preserve original array index for mutation operations
-    const indexed = historial.map((mov, originalIndex) => ({ mov, originalIndex })).reverse();
+    const indexed = historial.map((mov) => ({ mov })).reverse();
 
     return indexed.filter(({ mov }) => {
       // 1. Type filter
@@ -69,7 +69,7 @@ export const HistorialView: React.FC<HistorialViewProps> = ({
 
   // Group by date
   const groupedMovements = useMemo(() => {
-    const map = new Map<string, { mov: Movement; originalIndex: number }[]>();
+    const map = new Map<string, { mov: Movement }[]>();
     for (const item of filteredMovements) {
       const dateKey = item.mov.fecha || 'General';
       if (!map.has(dateKey)) {
@@ -80,11 +80,11 @@ export const HistorialView: React.FC<HistorialViewProps> = ({
     return Array.from(map.entries());
   }, [filteredMovements]);
 
-  const handleDeleteWithConfirmation = (originalIndex: number) => {
-    const mov = historial[originalIndex];
+  const handleDeleteWithConfirmation = (movementId: string) => {
+    const mov = historial.find((item) => item.id === movementId);
     if (mov) {
       setMovimientoParaEliminar({
-        index: originalIndex,
+        id: movementId,
         desc: mov.desc || (lang === 'es' ? 'Movimiento' : 'Movement'),
         monto: mov.monto,
       });
@@ -207,7 +207,7 @@ export const HistorialView: React.FC<HistorialViewProps> = ({
 
               {/* Items in that date */}
               <div className="space-y-2">
-                {items.map(({ mov, originalIndex }) => {
+                {items.map(({ mov }) => {
                   const isGasto = mov.tipo === 'gasto';
                   const isIngreso = mov.tipo === 'ingreso';
                   const isBase = mov.tipo === 'base';
@@ -232,7 +232,7 @@ export const HistorialView: React.FC<HistorialViewProps> = ({
 
                   return (
                     <div
-                      key={`${originalIndex}-${mov.fecha}-${mov.hora}`}
+                      key={mov.id}
                       className="bg-[#272B30] hover:bg-[#2c3138] border border-[#30353B] rounded-xl p-3.5 flex items-center justify-between gap-3 transition-colors shadow-sm"
                     >
                       <div className="flex items-center gap-3 min-w-0">
@@ -271,7 +271,7 @@ export const HistorialView: React.FC<HistorialViewProps> = ({
                         <div className="flex items-center gap-1">
                           <button
                             title={t('editar')}
-                            onClick={() => setMovimientoParaEditar({ mov, index: originalIndex })}
+                            onClick={() => setMovimientoParaEditar({ mov, id: mov.id })}
                             className="text-[#9AA3AD]/50 hover:text-[#35D0BA] p-1.5 rounded hover:bg-[#202328] transition-colors cursor-pointer"
                           >
                             <Edit3 className="w-3.5 h-3.5" />
@@ -279,7 +279,7 @@ export const HistorialView: React.FC<HistorialViewProps> = ({
 
                           <button
                             title={t('eliminar')}
-                            onClick={() => handleDeleteWithConfirmation(originalIndex)}
+                            onClick={() => handleDeleteWithConfirmation(mov.id)}
                             className="text-[#9AA3AD]/50 hover:text-[#F0525D] p-1.5 rounded hover:bg-[#202328] transition-colors cursor-pointer"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -299,7 +299,7 @@ export const HistorialView: React.FC<HistorialViewProps> = ({
       {movimientoParaEditar && (
         <EditarMovimientoModal
           movimiento={movimientoParaEditar.mov}
-          index={movimientoParaEditar.index}
+          movementId={movimientoParaEditar.id}
           categoriasPersonalizadas={categoriasPersonalizadas}
           categoriasOcultas={categoriasOcultas}
           lang={lang}
@@ -316,7 +316,7 @@ export const HistorialView: React.FC<HistorialViewProps> = ({
           confirmText={lang === 'es' ? 'Eliminar' : 'Delete'}
           cancelText={lang === 'es' ? 'Cancelar' : 'Cancel'}
           isDestructive={true}
-          onConfirm={() => onDeleteMovement(movimientoParaEliminar.index)}
+          onConfirm={() => { onDeleteMovement(movimientoParaEliminar.id); setMovimientoParaEliminar(null); }}
           onClose={() => setMovimientoParaEliminar(null)}
         />
       )}

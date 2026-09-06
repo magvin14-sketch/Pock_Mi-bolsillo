@@ -1,7 +1,8 @@
 export type MovementType = 'gasto' | 'ingreso' | 'base';
 
 export interface Movement {
-  id?: string;
+  id: string;
+  updated_at?: string;
   desc: string;
   categoria: string | null;
   tipo: MovementType;
@@ -67,6 +68,8 @@ export interface AppData {
   presupuestos_categoria?: Record<string, number>;
   gastos_fijos?: FixedExpense[];
   historial_cortes?: CycleHistoryEntry[];
+  updated_at?: string;
+  deleted_movements?: string[];
 }
 
 export type ViewType = 'inicio' | 'historial' | 'deudas' | 'ahorros' | 'resumen' | 'ajustes';

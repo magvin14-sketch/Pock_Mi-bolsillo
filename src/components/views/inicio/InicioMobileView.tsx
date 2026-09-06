@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { CATEGORIAS, CATEGORIA_COLOR, TEXTOS } from '../../../config';
-import { formatColones, getCurrentTimestamp, getAllCategories, getCategoryLabel } from '../../../utils';
+import { formatColones, getCurrentTimestamp, parseMoneyInput, getAllCategories, getCategoryLabel } from '../../../utils';
 import {
   TrendingDown,
   TrendingUp,
@@ -104,7 +104,7 @@ export const InicioMobileView: React.FC<InicioComponentProps> = ({
       return;
     }
 
-    const cleanMontoNum = parseFloat(monto.replace(/,/g, '.'));
+    const cleanMontoNum = parseMoneyInput(monto) ?? NaN;
     if (isNaN(cleanMontoNum) || cleanMontoNum <= 0) {
       setErrorMsg(t('aviso_monto'));
       return;

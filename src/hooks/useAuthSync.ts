@@ -10,7 +10,7 @@ import {
   pushMovementToRemote,
   deleteMovementFromRemote,
   pushBudgetsToRemote,
-  pushUserDataToRemote,
+  pushLocalDataToRemote,
 } from '../services/syncService';
 import { AppData, Movement } from '../types';
 
@@ -264,17 +264,21 @@ export function useAuthSync(
     [user]
   );
 
-  // When user preferences, balances or debts change
+  // Any local state change is persisted as one atomic-ish push: movements, deletes, budgets and profile data.
   const notifyUserDataChanged = useCallback(
     (data: AppData) => {
       if (!user) return;
       if (typeof navigator !== 'undefined' && !navigator.onLine) return;
 
-      pushUserDataToRemote(user.id, data).then((ok) => {
+      pushLocalDataToRemote(user.id, data).then((ok) => {
         if (!ok) {
           setSyncError(
-            'No se pudieron guardar tus datos (saldo, deudas, metas) en la nube. Revisa la configuración de Supabase.'
+            'No se pudieron guardar tus cambios en la nube. Revisa tu conexión o la configuración de Supabase.'
           );
+        } else {
+          const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          setLastSyncTime(now);
+          localStorage.setItem('pock_last_sync_time', now);
         }
       });
     },

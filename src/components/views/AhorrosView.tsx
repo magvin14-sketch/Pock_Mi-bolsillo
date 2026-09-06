@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { SavingsGoal, LanguageCode } from '../../types';
 import { TEXTOS } from '../../config';
-import { formatColones, generateId } from '../../utils';
+import { formatColones, generateId, parseMoneyInput } from '../../utils';
 import { PiggyBank, Plus, CheckCircle2, TrendingUp, Calendar, Trash2, ArrowUpRight, ArrowDownLeft, X, Sparkles } from 'lucide-react';
 import { ModalPortal } from '../ModalPortal';
 import { ConfirmModal } from '../ConfirmModal';
@@ -64,13 +64,13 @@ export const AhorrosView: React.FC<AhorrosViewProps> = ({
       return;
     }
 
-    const valMeta = parseFloat(montoMeta.replace(/,/g, ''));
+    const valMeta = parseMoneyInput(montoMeta) ?? NaN;
     if (isNaN(valMeta) || valMeta <= 0) {
       setErrorMsg(lang === 'es' ? 'Ingresa un monto objetivo mayor a 0.' : 'Enter a target amount greater than 0.');
       return;
     }
 
-    const valInicial = montoInicial.trim() ? parseFloat(montoInicial.replace(/,/g, '')) : 0;
+    const valInicial = montoInicial.trim() ? parseMoneyInput(montoInicial) ?? NaN : 0;
     if (isNaN(valInicial) || valInicial < 0) {
       setErrorMsg(lang === 'es' ? 'Monto inicial no válido.' : 'Invalid initial amount.');
       return;
@@ -99,7 +99,7 @@ export const AhorrosView: React.FC<AhorrosViewProps> = ({
     e.preventDefault();
     if (!modalAbono) return;
 
-    const val = parseFloat(montoAbono.replace(/,/g, ''));
+    const val = parseMoneyInput(montoAbono) ?? NaN;
     if (isNaN(val) || val <= 0) return;
 
     onDepositToGoal(modalAbono.id, val, descontarLibre);
@@ -111,7 +111,7 @@ export const AhorrosView: React.FC<AhorrosViewProps> = ({
     e.preventDefault();
     if (!modalRetiro) return;
 
-    const val = parseFloat(montoRetiro.replace(/,/g, ''));
+    const val = parseMoneyInput(montoRetiro) ?? NaN;
     if (isNaN(val) || val <= 0) return;
 
     onWithdrawFromGoal(modalRetiro.id, val, devolverLibre);

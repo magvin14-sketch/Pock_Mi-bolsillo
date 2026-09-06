@@ -6,7 +6,13 @@ import {VitePWA} from 'vite-plugin-pwa';
 
 export default defineConfig(() => {
   return {
-    envPrefix: ['VITE_', 'SUPABASE_', 'NEXT_PUBLIC_'],
+    // Solo variables con prefijo VITE_ se exponen al bundle del navegador.
+    // (Antes también se exponían SUPABASE_* y NEXT_PUBLIC_*, lo cual es
+    // riesgoso: si alguien agrega en el futuro una variable como
+    // SUPABASE_SERVICE_ROLE_KEY, terminaría filtrada en el código del cliente,
+    // visible para cualquiera. La app solo necesita VITE_SUPABASE_URL y
+    // VITE_SUPABASE_ANON_KEY, que ya cumplen con este prefijo.)
+    envPrefix: ['VITE_'],
     plugins: [
       react(),
       tailwindcss(),

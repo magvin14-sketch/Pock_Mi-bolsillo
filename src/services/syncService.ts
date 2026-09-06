@@ -1,10 +1,12 @@
 import { getSupabaseClient } from './supabase';
-import { AppData, Movement, Debt, SavingsGoal, FixedExpense, CycleHistoryEntry } from '../types';
+import { AppData, Movement, Debt, SavingsGoal } from '../types';
+import { generateId } from '../utils';
 
 export interface RemoteSyncPayload {
   movements: Movement[];
   budgets: Record<string, number>;
   userData: Partial<AppData> | null;
+  deletedMovements: string[];
 }
 
 export interface SyncResult {
@@ -14,434 +16,210 @@ export interface SyncResult {
   syncedAt?: string;
 }
 
-/**
- * Downloads all remote data from Supabase for the authenticated user_id
- */
+const nowIso = () => new Date().toISOString();
+
+function newer<T extends { updated_at?: string }>(local: T, remote: T): T {
+  const lt = local.updated_at ? Date.parse(local.updated_at) : 0;
+  const rt = remote.updated_at ? Date.parse(remote.updated_at) : 0;
+  return lt > rt ? local : remote;
+}
+
 export async function fetchRemoteUserData(userId: string): Promise<RemoteSyncPayload | null> {
   const supabase = getSupabaseClient();
   if (!supabase) return null;
-
   try {
-    // 1. Fetch movements filtered strictly by user_id
-    const { data: movementsData, error: movError } = await supabase
-      .from('movements')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+    const [movementsResult, budgetsResult, profileResult] = await Promise.all([
+      supabase.from('movements').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+      supabase.from('budgets').select('*').eq('user_id', userId),
+      supabase.from('user_data').select('*').eq('user_id', userId).maybeSingle(),
+    ]);
 
-    if (movError) {
-      console.warn('Error fetching movements from Supabase:', movError.message);
+    if (movementsResult.error) throw new Error(`movements: ${movementsResult.error.message}`);
+    if (budgetsResult.error) throw new Error(`budgets: ${budgetsResult.error.message}`);
+    if (profileResult.error && profileResult.error.code !== 'PGRST116') {
+      throw new Error(`user_data: ${profileResult.error.message}`);
     }
 
-    // 2. Fetch category budgets filtered strictly by user_id
-    const { data: budgetsData, error: budgetError } = await supabase
-      .from('budgets')
-      .select('*')
-      .eq('user_id', userId);
-
-    if (budgetError) {
-      console.warn('Error fetching budgets from Supabase:', budgetError.message);
-    }
-
-    // 3. Fetch user settings and state (dinero_libre, deudas, metas)
-    const { data: profileData, error: profileError } = await supabase
-      .from('user_data')
-      .select('*')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    if (profileError && profileError.code !== 'PGRST116') {
-      console.warn('Error fetching user_data from Supabase:', profileError.message);
-    }
-
-    // Transform movements
-    const movements: Movement[] = (movementsData || []).map((row: any) => ({
-      id: row.id,
-      desc: row.desc,
-      categoria: row.categoria || null,
-      tipo: row.tipo,
-      monto: Number(row.monto) || 0,
-      fecha: row.fecha,
-      hora: row.hora,
+    const movements: Movement[] = (movementsResult.data || []).map((row: any) => ({
+      id: String(row.id), desc: String(row.desc ?? ''), categoria: row.categoria || null,
+      tipo: row.tipo === 'ingreso' || row.tipo === 'base' ? row.tipo : 'gasto',
+      monto: Number(row.monto) || 0, fecha: String(row.fecha ?? ''), hora: String(row.hora ?? ''),
+      updated_at: typeof row.updated_at === 'string' ? row.updated_at : row.created_at,
     }));
 
-    // Transform budgets (support both categoria/category and monto/amount)
     const budgets: Record<string, number> = {};
-    if (Array.isArray(budgetsData)) {
-      budgetsData.forEach((b: any) => {
-        const cat = b.categoria || b.category;
-        const val = typeof b.monto !== 'undefined' ? b.monto : b.amount;
-        if (cat && typeof val !== 'undefined') {
-          budgets[cat] = Number(val);
-        }
-      });
+    for (const b of budgetsResult.data || []) {
+      const cat = b.categoria || b.category;
+      const val = b.monto ?? b.amount;
+      if (cat && val !== undefined) budgets[String(cat)] = Number(val) || 0;
     }
 
-    // Transform user_data
     let userData: Partial<AppData> | null = null;
-    if (profileData) {
-      const nested = profileData.data || {};
+    const profile: any = profileResult.data;
+    if (profile) {
+      const nested = profile.data || {};
+      const pick = (key: string, fallback: any) => profile[key] !== undefined && profile[key] !== null ? profile[key] : nested[key] ?? fallback;
       userData = {
-        dinero_libre: Number(profileData.dinero_libre ?? nested.dinero_libre) || 0,
-        limite_alerta: Number(profileData.limite_alerta ?? nested.limite_alerta) || 0,
-        idioma_actual: (profileData.idioma_actual || nested.idioma_actual) === 'en' ? 'en' : 'es',
-        tema: profileData.tema || nested.tema || 'dark',
-        deudas: Array.isArray(profileData.deudas)
-          ? profileData.deudas
-          : Array.isArray(nested.deudas)
-          ? nested.deudas
-          : [],
-        metas_ahorro: Array.isArray(profileData.metas_ahorro)
-          ? profileData.metas_ahorro
-          : Array.isArray(nested.metas_ahorro)
-          ? nested.metas_ahorro
-          : [],
-        gastos_fijos: Array.isArray(profileData.gastos_fijos)
-          ? profileData.gastos_fijos
-          : Array.isArray(nested.gastos_fijos)
-          ? nested.gastos_fijos
-          : [],
-        historial_cortes: Array.isArray(profileData.historial_cortes)
-          ? profileData.historial_cortes
-          : Array.isArray(nested.historial_cortes)
-          ? nested.historial_cortes
-          : [],
-        categorias_personalizadas: Array.isArray(profileData.categorias_personalizadas)
-          ? profileData.categorias_personalizadas
-          : Array.isArray(nested.categorias_personalizadas)
-          ? nested.categorias_personalizadas
-          : [],
-        categorias_ocultas: Array.isArray(profileData.categorias_ocultas)
-          ? profileData.categorias_ocultas
-          : Array.isArray(nested.categorias_ocultas)
-          ? nested.categorias_ocultas
-          : [],
+        dinero_libre: Number(pick('dinero_libre', 0)) || 0,
+        limite_alerta: Number(pick('limite_alerta', 0)) || 0,
+        idioma_actual: pick('idioma_actual', 'es') === 'en' ? 'en' : 'es',
+        tema: ['dark','light','system'].includes(pick('tema', 'dark')) ? pick('tema', 'dark') : 'dark',
+        deudas: Array.isArray(pick('deudas', [])) ? pick('deudas', []) : [],
+        metas_ahorro: Array.isArray(pick('metas_ahorro', [])) ? pick('metas_ahorro', []) : [],
+        gastos_fijos: Array.isArray(pick('gastos_fijos', [])) ? pick('gastos_fijos', []) : [],
+        historial_cortes: Array.isArray(pick('historial_cortes', [])) ? pick('historial_cortes', []) : [],
+        categorias_personalizadas: Array.isArray(pick('categorias_personalizadas', [])) ? pick('categorias_personalizadas', []) : [],
+        categorias_ocultas: Array.isArray(pick('categorias_ocultas', [])) ? pick('categorias_ocultas', []) : [],
+        deleted_movements: Array.isArray(pick('deleted_movements', [])) ? pick('deleted_movements', []) : [],
+        updated_at: typeof profile.updated_at === 'string' ? profile.updated_at : undefined,
       };
     }
 
-    return {
-      movements,
-      budgets,
-      userData,
-    };
-  } catch (err: any) {
-    console.error('Fatal error during fetchRemoteUserData:', err);
+    return { movements, budgets, userData, deletedMovements: userData?.deleted_movements || [] };
+  } catch (err) {
+    console.error('Error fetching remote Pock data:', err);
     return null;
   }
 }
 
-/**
- * Intelligent reconciliation of remote cloud data and local client data:
- * - Deduplicates movements by ID.
- * - Handles newly created records on either device.
- * - Preserves user preferences and balances.
- */
 export function mergeRemoteWithLocal(local: AppData, remote: RemoteSyncPayload): AppData {
-  // If remote has no data yet, keep local
-  if (!remote.userData && remote.movements.length === 0) {
-    return local;
-  }
-
-  // 1. Merge movements: combine unique by id
+  const deleted = new Set([...(local.deleted_movements || []), ...(remote.deletedMovements || [])]);
   const movementMap = new Map<string, Movement>();
-
-  // Add remote movements first
-  for (const mov of remote.movements) {
-    const key = mov.id || `${mov.fecha}-${mov.hora}-${mov.desc}-${mov.monto}`;
-    movementMap.set(key, mov);
+  for (const m of remote.movements) if (m.id && !deleted.has(m.id)) movementMap.set(m.id, m);
+  for (const m of local.historial) {
+    if (!m.id || deleted.has(m.id)) continue;
+    const existing = movementMap.get(m.id);
+    movementMap.set(m.id, existing ? newer(m, existing) : m);
   }
 
-  // Add local movements (so any un-synced offline records are retained)
-  for (const mov of local.historial) {
-    const key = mov.id || `${mov.fecha}-${mov.hora}-${mov.desc}-${mov.monto}`;
-    if (!movementMap.has(key)) {
-      movementMap.set(key, mov);
-    }
-  }
+  const remoteUser = remote.userData;
+  const localUpdated = local.updated_at ? Date.parse(local.updated_at) : 0;
+  const remoteUpdated = remoteUser?.updated_at ? Date.parse(remoteUser.updated_at) : 0;
+  const localHasMeaningfulData = local.historial.length > 0 || local.dinero_libre !== 0 || local.deudas.length > 0 || (local.metas_ahorro || []).length > 0;
+  const remoteLooksNew = remote.movements.length === 0 && !!remoteUser && Number(remoteUser.dinero_libre || 0) === 0 && (remoteUser.deudas || []).length === 0 && (remoteUser.metas_ahorro || []).length === 0;
+  const useLocalProfile = (localHasMeaningfulData && remoteLooksNew && localUpdated === 0) || localUpdated > remoteUpdated;
+  const profile = useLocalProfile ? local : (remoteUser || local);
 
-  const mergedHistorial = Array.from(movementMap.values());
-
-  // 2. Merge budgets
-  const mergedBudgets: Record<string, number> = {
-    ...(local.presupuestos_categoria || {}),
-    ...(remote.budgets || {}),
-  };
-
-  // 3. User data / balance
-  // If local is brand new/default or remote has more movements, prioritize remote balance
-  const remoteUserData = remote.userData;
-  const isLocalDefault = local.historial.length <= 1 && local.dinero_libre === 0;
-
-  const dinero_libre =
-    remoteUserData && typeof remoteUserData.dinero_libre === 'number'
-      ? remoteUserData.dinero_libre
-      : local.dinero_libre;
-
-  const limite_alerta =
-    remoteUserData && typeof remoteUserData.limite_alerta === 'number'
-      ? remoteUserData.limite_alerta
-      : local.limite_alerta;
-
-  // Merge deudas by id
   const debtMap = new Map<string, Debt>();
-  if (remoteUserData?.deudas) {
-    remoteUserData.deudas.forEach((d) => debtMap.set(d.id, d));
-  }
-  local.deudas.forEach((d) => {
-    if (!debtMap.has(d.id)) {
-      debtMap.set(d.id, d);
-    }
-  });
+  for (const d of remoteUser?.deudas || []) debtMap.set(d.id, d);
+  for (const d of local.deudas) if (!debtMap.has(d.id)) debtMap.set(d.id, d);
 
-  // Merge savings goals by id
   const goalMap = new Map<string, SavingsGoal>();
-  if (remoteUserData?.metas_ahorro) {
-    remoteUserData.metas_ahorro.forEach((g) => goalMap.set(g.id, g));
-  }
-  (local.metas_ahorro || []).forEach((g) => {
-    if (!goalMap.has(g.id)) {
-      goalMap.set(g.id, g);
-    }
-  });
+  for (const g of remoteUser?.metas_ahorro || []) goalMap.set(g.id, g);
+  for (const g of local.metas_ahorro || []) if (!goalMap.has(g.id)) goalMap.set(g.id, g);
 
-  // Merge custom categories
-  const customCatSet = new Set<string>([
-    ...(local.categorias_personalizadas || []),
-    ...(remoteUserData?.categorias_personalizadas || []),
-  ]);
-
-  const hiddenCatSet = new Set<string>([
-    ...(local.categorias_ocultas || []),
-    ...(remoteUserData?.categorias_ocultas || []),
-  ]);
-
-  return {
+  const merged: AppData = {
     ...local,
-    dinero_libre,
-    limite_alerta,
-    idioma_actual: remoteUserData?.idioma_actual || local.idioma_actual,
-    tema: remoteUserData?.tema || local.tema,
-    historial: mergedHistorial,
-    presupuestos_categoria: mergedBudgets,
+    dinero_libre: Number(profile.dinero_libre ?? local.dinero_libre),
+    limite_alerta: Number(profile.limite_alerta ?? local.limite_alerta),
+    idioma_actual: profile.idioma_actual || local.idioma_actual,
+    tema: profile.tema || local.tema,
+    historial: Array.from(movementMap.values()),
+    presupuestos_categoria: useLocalProfile ? (local.presupuestos_categoria || {}) : (remote.budgets && Object.keys(remote.budgets).length ? remote.budgets : local.presupuestos_categoria || {}),
     deudas: Array.from(debtMap.values()),
     metas_ahorro: Array.from(goalMap.values()),
-    gastos_fijos: remoteUserData?.gastos_fijos || local.gastos_fijos,
-    historial_cortes: remoteUserData?.historial_cortes || local.historial_cortes,
-    categorias_personalizadas: Array.from(customCatSet),
-    categorias_ocultas: Array.from(hiddenCatSet),
+    gastos_fijos: profile.gastos_fijos || local.gastos_fijos,
+    historial_cortes: profile.historial_cortes || local.historial_cortes,
+    categorias_personalizadas: Array.from(new Set([...(local.categorias_personalizadas || []), ...(remoteUser?.categorias_personalizadas || [])])),
+    categorias_ocultas: Array.from(new Set([...(local.categorias_ocultas || []), ...(remoteUser?.categorias_ocultas || [])])),
+    deleted_movements: Array.from(deleted),
+    updated_at: useLocalProfile ? local.updated_at : remoteUser?.updated_at,
   };
+  return merged;
 }
 
-/**
- * Pushes a single movement to Supabase (Add / Edit)
- */
 export async function pushMovementToRemote(userId: string, movement: Movement): Promise<boolean> {
   const supabase = getSupabaseClient();
-  if (!supabase || !userId) return false;
-
+  if (!supabase || !userId || !movement.id) return false;
   try {
-    const payload = {
-      id: movement.id || `${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
-      user_id: userId,
-      desc: movement.desc,
-      categoria: movement.categoria,
-      tipo: movement.tipo,
-      monto: movement.monto,
-      fecha: movement.fecha,
-      hora: movement.hora,
-      updated_at: new Date().toISOString(),
-    };
-
-    const { error } = await supabase.from('movements').upsert(payload);
-    if (error) {
-      console.warn('Could not push movement to Supabase:', error.message);
-      return false;
-    }
-    return true;
-  } catch (err) {
-    console.warn('Network error pushing movement to Supabase:', err);
-    return false;
-  }
+    const { error } = await supabase.from('movements').upsert({ ...movement, user_id: userId, updated_at: movement.updated_at || nowIso() });
+    return !error;
+  } catch { return false; }
 }
 
-/**
- * Deletes a single movement from remote Supabase
- */
 export async function deleteMovementFromRemote(userId: string, movementId: string): Promise<boolean> {
   const supabase = getSupabaseClient();
   if (!supabase || !userId || !movementId) return false;
-
   try {
-    const { error } = await supabase
-      .from('movements')
-      .delete()
-      .eq('id', movementId)
-      .eq('user_id', userId);
-
-    if (error) {
-      console.warn('Could not delete movement from Supabase:', error.message);
-      return false;
-    }
-    return true;
-  } catch (err) {
-    console.warn('Network error deleting movement from Supabase:', err);
-    return false;
-  }
+    const { error } = await supabase.from('movements').delete().eq('id', movementId).eq('user_id', userId);
+    return !error;
+  } catch { return false; }
 }
 
-/**
- * Pushes category budgets to Supabase
- */
-export async function pushBudgetsToRemote(
-  userId: string,
-  budgets: Record<string, number>
-): Promise<boolean> {
+export async function pushBudgetsToRemote(userId: string, budgets: Record<string, number>): Promise<boolean> {
   const supabase = getSupabaseClient();
   if (!supabase || !userId) return false;
-
   try {
-    const rows = Object.entries(budgets).map(([categoria, monto]) => ({
-      id: `${userId}_${categoria}`,
-      user_id: userId,
-      categoria,
-      monto,
-    }));
-
-    if (rows.length === 0) return true;
-
-    const { error } = await supabase.from('budgets').upsert(rows);
-    if (error) {
-      console.warn('Could not push budgets to Supabase:', error.message);
-      return false;
-    }
-    return true;
-  } catch (err) {
-    console.warn('Network error pushing budgets to Supabase:', err);
-    return false;
-  }
+    const { error: deleteError } = await supabase.from('budgets').delete().eq('user_id', userId);
+    if (deleteError) return false;
+    const rows = Object.entries(budgets).map(([categoria, monto]) => ({ id: `${userId}_${encodeURIComponent(categoria)}`, user_id: userId, categoria, monto, updated_at: nowIso() }));
+    if (!rows.length) return true;
+    const { error } = await supabase.from('budgets').insert(rows);
+    return !error;
+  } catch { return false; }
 }
 
-/**
- * Pushes general user data (balance, debts, settings, goals) to Supabase
- */
 export async function pushUserDataToRemote(userId: string, data: AppData): Promise<boolean> {
   const supabase = getSupabaseClient();
   if (!supabase || !userId) return false;
-
   try {
-    const payload: any = {
-      user_id: userId,
-      dinero_libre: data.dinero_libre,
-      limite_alerta: data.limite_alerta,
-      idioma_actual: data.idioma_actual,
-      tema: data.tema || 'dark',
-      deudas: data.deudas || [],
-      metas_ahorro: data.metas_ahorro || [],
-      gastos_fijos: data.gastos_fijos || [],
-      historial_cortes: data.historial_cortes || [],
-      categorias_personalizadas: data.categorias_personalizadas || [],
-      categorias_ocultas: data.categorias_ocultas || [],
-      updated_at: new Date().toISOString(),
+    const payload = {
+      user_id: userId, dinero_libre: data.dinero_libre, limite_alerta: data.limite_alerta,
+      idioma_actual: data.idioma_actual, tema: data.tema || 'dark', deudas: data.deudas || [],
+      metas_ahorro: data.metas_ahorro || [], gastos_fijos: data.gastos_fijos || [],
+      historial_cortes: data.historial_cortes || [], categorias_personalizadas: data.categorias_personalizadas || [],
+      categorias_ocultas: data.categorias_ocultas || [], deleted_movements: data.deleted_movements || [], updated_at: data.updated_at || nowIso(),
     };
-
     const { error } = await supabase.from('user_data').upsert(payload, { onConflict: 'user_id' });
-    if (error) {
-      // If schema has different primary key, retry with id
-      const retryResult = await supabase.from('user_data').upsert(payload);
-      if (retryResult.error) {
-        console.warn('Could not push user_data to Supabase:', error.message || retryResult.error.message);
-        return false;
-      }
+    return !error;
+  } catch { return false; }
+}
+
+export async function pushLocalDataToRemote(userId: string, data: AppData): Promise<boolean> {
+  const supabase = getSupabaseClient();
+  if (!supabase || !userId) return false;
+  try {
+    const deleted = new Set(data.deleted_movements || []);
+    for (const id of deleted) await deleteMovementFromRemote(userId, id);
+    const rows = data.historial.filter(m => m.id && !deleted.has(m.id)).map(m => ({
+      ...m, user_id: userId, updated_at: m.updated_at || nowIso(),
+    }));
+    for (let i = 0; i < rows.length; i += 50) {
+      const { error } = await supabase.from('movements').upsert(rows.slice(i, i + 50));
+      if (error) return false;
     }
-    return true;
+    if (!(await pushBudgetsToRemote(userId, data.presupuestos_categoria || {}))) return false;
+    return await pushUserDataToRemote(userId, { ...data, updated_at: data.updated_at || nowIso() });
   } catch (err) {
-    console.warn('Network error pushing user_data to Supabase:', err);
+    console.warn('Error pushing local Pock state:', err);
     return false;
   }
 }
 
-/**
- * Executes a full 2-way sync:
- * 1. Pulls remote state.
- * 2. Merges with local data.
- * 3. Uploads merged state back to cloud so both device and cloud are in parity.
- */
-export async function synchronizeFullData(
-  userId: string,
-  localData: AppData
-): Promise<SyncResult> {
+export async function synchronizeFullData(userId: string, localData: AppData): Promise<SyncResult> {
   const supabase = getSupabaseClient();
-  if (!supabase || !userId) {
-    return { success: false, error: 'Supabase no está configurado o no hay sesión activa' };
-  }
-
+  if (!supabase || !userId) return { success: false, error: 'Supabase no está configurado o no hay sesión activa' };
   try {
-    // 1. Fetch remote data
     const remote = await fetchRemoteUserData(userId);
+    if (!remote) return { success: false, error: 'No se pudo leer la información de Supabase.' };
+    const merged = mergeRemoteWithLocal(localData, remote);
 
-    // 2. Merge remote with local
-    const mergedData = remote ? mergeRemoteWithLocal(localData, remote) : localData;
+    const deleted = new Set(merged.deleted_movements || []);
+    for (const id of deleted) await deleteMovementFromRemote(userId, id);
 
-    // 3. Push merged movements to remote
-    let movementsFailed = 0;
-    if (mergedData.historial.length > 0) {
-      const movementRows = mergedData.historial.map((m) => ({
-        id: m.id || `${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
-        user_id: userId,
-        desc: m.desc,
-        categoria: m.categoria,
-        tipo: m.tipo,
-        monto: m.monto,
-        fecha: m.fecha,
-        hora: m.hora,
-        updated_at: new Date().toISOString(),
-      }));
-
-      // Batch upsert in chunks of 50
-      for (let i = 0; i < movementRows.length; i += 50) {
-        const chunk = movementRows.slice(i, i + 50);
-        const { error: chunkError } = await supabase.from('movements').upsert(chunk);
-        if (chunkError) {
-          movementsFailed++;
-          console.warn('Error al subir movimientos a Supabase:', chunkError.message);
-        }
-      }
+    const movements = merged.historial.filter(m => m.id && !deleted.has(m.id));
+    for (let i = 0; i < movements.length; i += 50) {
+      const rows = movements.slice(i, i + 50).map(m => ({ ...m, user_id: userId, updated_at: m.updated_at || nowIso() }));
+      const { error } = await supabase.from('movements').upsert(rows);
+      if (error) return { success: false, data: merged, error: `No se pudieron sincronizar movimientos: ${error.message}` };
     }
 
-    // 4. Push budgets
-    let budgetsOk = true;
-    if (mergedData.presupuestos_categoria) {
-      budgetsOk = await pushBudgetsToRemote(userId, mergedData.presupuestos_categoria);
-    }
+    if (!(await pushBudgetsToRemote(userId, merged.presupuestos_categoria || {}))) return { success: false, data: merged, error: 'No se pudieron sincronizar los presupuestos.' };
+    if (!(await pushUserDataToRemote(userId, { ...merged, updated_at: merged.updated_at || nowIso() }))) return { success: false, data: merged, error: 'No se pudieron sincronizar los datos generales.' };
 
-    // 5. Push user profile data
-    const userDataOk = await pushUserDataToRemote(userId, mergedData);
-
-    if (movementsFailed > 0 || !budgetsOk || !userDataOk) {
-      const fallos: string[] = [];
-      if (movementsFailed > 0) fallos.push('movimientos');
-      if (!budgetsOk) fallos.push('presupuestos');
-      if (!userDataOk) fallos.push('datos generales (saldo, deudas, metas)');
-
-      return {
-        success: false,
-        data: mergedData,
-        error: `No se pudo subir a la nube: ${fallos.join(', ')}. Revisa que las tablas de Supabase existan (usa el script SQL) y que las políticas RLS estén activas.`,
-      };
-    }
-
-    const nowFormatted = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-    return {
-      success: true,
-      data: mergedData,
-      syncedAt: nowFormatted,
-    };
+    const syncedAt = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return { success: true, data: { ...merged, updated_at: merged.updated_at || nowIso() }, syncedAt };
   } catch (err: any) {
-    console.error('Error during full synchronization:', err);
-    return {
-      success: false,
-      error: err.message || 'Error de conexión durante la sincronización',
-    };
+    return { success: false, error: err?.message || 'Error durante la sincronización' };
   }
 }

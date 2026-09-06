@@ -28,7 +28,28 @@ export function getCurrentTimestamp(): { fecha: string; hora: string } {
 }
 
 export function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+}
+
+/** Parse user-entered monetary values consistently. Supports 1234.56, 1234,56 and 1,234.56. */
+export function parseMoneyInput(value: string): number | null {
+  const raw = String(value ?? '').trim().replace(/₡/g, '').replace(/\s/g, '');
+  if (!raw) return null;
+  let normalized = raw;
+  const hasComma = normalized.includes(',');
+  const hasDot = normalized.includes('.');
+  if (hasComma && hasDot) {
+    const lastComma = normalized.lastIndexOf(',');
+    const lastDot = normalized.lastIndexOf('.');
+    if (lastComma > lastDot) normalized = normalized.replace(/\./g, '').replace(',', '.');
+    else normalized = normalized.replace(/,/g, '');
+  } else if (hasComma) {
+    const parts = normalized.split(',');
+    normalized = parts.length === 2 && parts[1].length <= 2 ? `${parts[0]}.${parts[1]}` : parts.join('');
+  }
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 export function loadStoredData(): AppData {
@@ -54,7 +75,8 @@ export function loadStoredData(): AppData {
           ? parsed.historial
               .filter((m: any) => m && typeof m === 'object')
               .map((m: any, idx: number) => ({
-                id: m.id || `mov-${idx}-${Date.now()}`,
+                id: String(m.id || `mov-${idx}-${Date.now()}`),
+                updated_at: typeof m.updated_at === 'string' ? m.updated_at : undefined,
                 desc: String(m.desc || ''),
                 categoria: m.categoria || null,
                 tipo: m.tipo === 'ingreso' || m.tipo === 'base' ? m.tipo : 'gasto',
@@ -103,6 +125,10 @@ export function loadStoredData(): AppData {
           : [],
         categorias_ocultas: Array.isArray(parsed.categorias_ocultas)
           ? parsed.categorias_ocultas.filter((c: any) => typeof c === 'string')
+          : [],
+        updated_at: typeof parsed.updated_at === 'string' ? parsed.updated_at : undefined,
+        deleted_movements: Array.isArray(parsed.deleted_movements)
+          ? parsed.deleted_movements.filter((id: any) => typeof id === 'string')
           : [],
       };
     }
@@ -176,6 +202,7 @@ export function createBaseMovement(monto: number, baseLabel: string): Movement {
     monto,
     fecha,
     hora,
+    updated_at: new Date().toISOString(),
   };
 }
 

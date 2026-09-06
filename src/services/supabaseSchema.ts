@@ -46,8 +46,28 @@ CREATE TABLE IF NOT EXISTS public.user_data (
   historial_cortes JSONB NOT NULL DEFAULT '[]'::jsonb,
   categorias_personalizadas JSONB NOT NULL DEFAULT '[]'::jsonb,
   categorias_ocultas JSONB NOT NULL DEFAULT '[]'::jsonb,
+  deleted_movements JSONB NOT NULL DEFAULT '[]'::jsonb,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Migraciones seguras para instalaciones existentes
+ALTER TABLE public.user_data ADD COLUMN IF NOT EXISTS deleted_movements JSONB NOT NULL DEFAULT '[]'::jsonb;
+
+-- Trigger para mantener updated_at actualizado
+CREATE OR REPLACE FUNCTION public.set_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS movements_set_updated_at ON public.movements;
+CREATE TRIGGER movements_set_updated_at BEFORE UPDATE ON public.movements FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+DROP TRIGGER IF EXISTS budgets_set_updated_at ON public.budgets;
+CREATE TRIGGER budgets_set_updated_at BEFORE UPDATE ON public.budgets FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+DROP TRIGGER IF EXISTS user_data_set_updated_at ON public.user_data;
+CREATE TRIGGER user_data_set_updated_at BEFORE UPDATE ON public.user_data FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- ==============================================================================
 -- POLÍTICAS DE SEGURIDAD A NIVEL DE FILA (ROW LEVEL SECURITY - RLS)
