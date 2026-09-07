@@ -40,7 +40,7 @@ export const HistorialView: React.FC<HistorialViewProps> = ({
     const term = busqueda.trim().toLowerCase();
 
     // Map to preserve original array index for mutation operations
-    const indexed = historial.map((mov) => ({ mov })).reverse();
+    const indexed = historial.map((mov) => ({ mov }));
 
     return indexed.filter(({ mov }) => {
       // 1. Type filter
@@ -77,7 +77,17 @@ export const HistorialView: React.FC<HistorialViewProps> = ({
       }
       map.get(dateKey)!.push(item);
     }
-    return Array.from(map.entries());
+
+    // Ordena los grupos de fecha del más reciente al más antiguo (fecha en formato DD/MM/YYYY)
+    const parseFecha = (fecha: string): number => {
+      const [day, month, year] = fecha.split('/').map(Number);
+      if (!day || !month || !year) return 0;
+      return new Date(year, month - 1, day).getTime();
+    };
+
+    return Array.from(map.entries()).sort(
+      ([fechaA], [fechaB]) => parseFecha(fechaB) - parseFecha(fechaA)
+    );
   }, [filteredMovements]);
 
   const handleDeleteWithConfirmation = (movementId: string) => {

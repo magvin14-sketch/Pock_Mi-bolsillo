@@ -186,7 +186,7 @@ export const AuthSyncModal: React.FC<AuthSyncModalProps> = ({
           {user ? (
             <div className="space-y-4">
               {/* Account Card */}
-              <div className="p-4 rounded-xl bg-[#202328]/80 border border-[#30353B]/70 space-y-3">
+              <div className="p-4 rounded-xl bg-[#202328] border border-[#30353B]/70 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-[#9AA3AD]">
                     {lang === 'es' ? 'Cuenta activa' : 'Active Account'}
@@ -457,7 +457,7 @@ export const AuthSyncModal: React.FC<AuthSyncModalProps> = ({
               </form>
 
               {/* Devices note */}
-              <div className="p-3 bg-[#121316]/60 rounded-xl border border-[#30353B]/40 text-xs text-[#9AA3AD] flex items-center gap-2.5">
+              <div className="p-3 bg-[#121316] rounded-xl border border-[#30353B]/40 text-xs text-[#9AA3AD] flex items-center gap-2.5">
                 <Laptop className="w-4 h-4 text-[#35D0BA] shrink-0" />
                 <span>
                   {lang === 'es'
